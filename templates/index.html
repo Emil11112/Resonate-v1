@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="p-5 mb-4 bg-light rounded-3">
+                <div class="container-fluid py-5">
+                    <h1 class="display-5 fw-bold">Welcome to Resonate</h1>
+                    <p class="col-md-8 fs-4">Connect with other music lovers, share your favorite songs, and discover new music.</p>
+                    {% if not current_user.is_authenticated %}
+                    <div>
+                        <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg me-2">Sign Up</a>
+                        <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg">Log In</a>
+                    </div>
+                    {% else %}
+                    <a href="{{ url_for('create_post') }}" class="btn btn-primary btn-lg">Create a Post</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2>Recent Users</h2>
+        </div>
+    </div>
+    
+    <div class="row">
+        {% for user in users[:6] %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <img src="{{ url_for('static', filename='profile_pics/' + user.profilePicture) }}" 
+                         class="rounded-circle mb-3" style="width: 80px; height: 80px; object-fit: cover;" 
+                         alt="{{ user.username }}'s profile picture">
+                    <h5 class="card-title">{{ user.username }}</h5>
+                    
+                    {% if user.favoriteGenres %}
+                    <div class="mb-3">
+                        {% for genre in user.favoriteGenres %}
+                        <span class="badge bg-primary me-1">{{ genre }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('profile', username=user.username) }}" class="btn btn-outline-primary">View Profile</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="row mb-5">
+        <div class="col-md-12 text-center">
+            <a href="{{ url_for('users') }}" class="btn btn-outline-primary">View All Users</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

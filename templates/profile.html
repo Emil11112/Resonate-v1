@@ -1,175 +1,193 @@
 {% extends "base.html" %}
 
-{% block title %}Edit Profile{% endblock %}
+{% block title %}{{ user.username }}'s Profile{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="row">
-        <div class="col-md-12 mb-4">
-            <h1>Edit Your Profile</h1>
-            <p class="text-muted">Update your profile information and preferences</p>
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <nav class="d-flex justify-content-between align-items-center border-bottom pb-3">
+                <div class="h1">{{ user.username }}</div>
+                <div class="d-flex align-items-center">
+                    {% if user.username == current_user.username %}
+                    <a href="{{ url_for('edit_profile') }}" class="btn btn-outline-secondary me-2">Edit Profile</a>
+                    {% else %}
+                    {% if current_user.is_authenticated and current_user.is_following(user) %}
+                    <a href="{{ url_for('unfollow', username=user.username) }}" class="btn btn-outline-secondary me-2">Unfollow</a>
+                    {% elif current_user.is_authenticated %}
+                    <a href="{{ url_for('follow', username=user.username) }}" class="btn btn-primary me-2">Follow</a>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </nav>
         </div>
     </div>
-
-    <form method="POST" enctype="multipart/form-data">
-        <div class="row">
-            <!-- Profile Basics -->
-            <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5>Basic Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}" readonly>
-                            <div class="form-text">Username cannot be changed</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="email" name="email" value="{{ current_user.email }}" required>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="favorite_genre" class="form-label">Favorite Genre</label>
-                            <select class="form-select" id="favorite_genre" name="favorite_genre">
-                                <option value="">Select a genre</option>
-                                {% set genres = ['Rock', 'Pop', 'Metal', 'EDM', 'Hip Hop', 'Classical', 'Jazz', 'Country', 'R&B', 'Indie'] %}
-                                {% for genre in genres %}
-                                <option value="{{ genre }}" {% if genre == current_user.favorite_genre %}selected{% endif %}>{{ genre }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="bio" class="form-label">Bio</label>
-                            <textarea class="form-control" id="bio" name="bio" rows="3">{{ current_user.bio or '' }}</textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Profile Pictures & Media -->
-            <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5>Profile Media</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-4">
-                            <label class="form-label">Current Profile Picture</label>
-                            <div class="text-center mb-2">
-                                <div class="octagon-container">
-                                    <img src="{{ url_for('static', filename='profile_pics/' + current_user.profile_picture) }}" class="profile-pic" alt="Profile Picture">
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="profile_picture" class="form-label">Change Profile Picture</label>
-                                <input class="form-control" type="file" id="profile_picture" name="profile_picture" accept="image/*">
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="song_picture" class="form-label">Song of the Day Picture</label>
-                            <input class="form-control" type="file" id="song_picture" name="song_picture" accept="image/*">
-                            {% if current_user.song_picture %}
-                            <div class="mt-2">
-                                <img src="{{ url_for('static', filename='song_pics/' + current_user.song_picture) }}" class="img-thumbnail" style="max-width: 150px;" alt="Song Picture">
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Favorite Songs Section -->
-        <div class="row">
-            <div class="col-md-12">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5>Favorite Songs</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="favorite-songs-container">
-                            {% for i in range(5) %}
-                            <div class="row mb-3 favorite-song-item">
-                                <div class="col-md-5">
-                                    <label class="form-label">Song Title</label>
-                                    <input type="text" class="form-control" name="song_title_{{ i }}" value="{{ current_user.favorite_songs[i].title if current_user.favorite_songs and i < current_user.favorite_songs|length else '' }}">
-                                </div>
-                                <div class="col-md-5">
-                                    <label class="form-label">Artist</label>
-                                    <input type="text" class="form-control" name="song_artist_{{ i }}" value="{{ current_user.favorite_songs[i].artist if current_user.favorite_songs and i < current_user.favorite_songs|length else '' }}">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">Icon</label>
-                                    <select class="form-select" name="song_icon_{{ i }}">
-                                        {% set icons = ["💋", "📱", "👟", "⭐", "🎵", "🎸", "🎹", "🎷", "🎤", "🥁"] %}
-                                        {% for icon in icons %}
-                                        <option value="{{ icon }}" {% if current_user.favorite_songs and i < current_user.favorite_songs|length and current_user.favorite_songs[i].icon == icon %}selected{% endif %}>{{ icon }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Song of the Day Section -->
-        <div class="row">
-            <div class="col-md-12">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5>Song of the Day</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="sotd_title" class="form-label">Song Title</label>
-                                    <input type="text" class="form-control" id="sotd_title" name="sotd_title" value="{{ current_user.sotd_title or '' }}">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="sotd_artist" class="form-label">Artist</label>
-                                    <input type="text" class="form-control" id="sotd_artist" name="sotd_artist" value="{{ current_user.sotd_artist or '' }}">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-12 text-end mb-4">
-                <a href="{{ url_for('profile', username=current_user.username) }}" class="btn btn-outline-secondary me-2">Cancel</a>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
-            </div>
-        </div>
-    </form>
-</div>
-
-<style>
-    .octagon-container {
-        width: 160px;
-        height: 160px;
-        margin: 0 auto;
-        position: relative;
-        clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
-        background-color: #f8f9fa;
-    }
     
-    .profile-pic {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-</style>
-{% endblock %}
+    <div class="row">
+        <!-- Left column with profile info -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <div class="octagon-container mb-3">
+                        <img src="{{ url_for('static', filename='profile_pics/' + user.profile_picture) }}" class="profile-pic" alt="{{ user.username }}'s profile picture">
+                    </div>
+                    <h3 class="card-title">{{ user.username }}</h3>
+                    <div class="rating-circle mb-2">{{ user.followers.count() }}</div>
+                    <div class="user-info mb-3">
+                        <p>{{ user.email }}</p>
+                        <p>Favorite Genre: {{ user.favorite_genre or 'Not specified' }}</p>
+                    </div>
+                    
+                    {% if user.bio %}
+                    <div class="user-bio mb-3">
+                        <p>{{ user.bio }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="genre-badges mb-3">
+                        {% set genres = ['Rock', 'Pop', 'Metal', 'EDM'] %}
+                        {% for genre in genres %}
+                        <span class="badge {% if genre == user.favorite_genre %}bg-primary{% else %}bg-secondary{% endif %} me-1">{{ genre }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Music preferences section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Music Preferences</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% if user.favorite_songs %}
+                            {% for song in user.favorite_songs %}
+                                <li class="list-group-item d-flex align-items-center">
+                                    <div class="circular-icon me-3">{{ song.icon }}</div>
+                                    <div>
+                                        <div class="fw-bold">{{ song.title }}</div>
+                                        <div class="text-muted">{{ song.artist }}</div>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        {% else %}
+                            <li class="list-group-item">No favorite songs added yet.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right column with content -->
+        <div class="col-md-8">
+            <!-- Song of the day section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Song of the day</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <div class="song-thumbnail">
+                                <div class="ratio ratio-1x1">
+                                    {% if user.song_picture %}
+                                        <img src="{{ url_for('static', filename='song_pics/' + user.song_picture) }}" class="img-fluid" alt="Song">
+                                    {% else %}
+                                        <img src="{{ url_for('static', filename='profile_pics/default.jpg') }}" class="img-fluid" alt="Song">
+                                    {% endif %}
+                                </div>
+                                <div class="play-button-overlay">▶</div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <h5>{{ user.sotd_title or 'No song selected' }}</h5>
+                            <p class="text-muted">{{ user.sotd_artist or 'Add a song of the day' }}</p>
+                            <div class="progress mb-2">
+                                <div class="progress-bar" role="progressbar" style="width: 30%" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <small>1:22</small>
+                                <div>
+                                    <span class="me-3">1</span>
+                                    <span class="me-3">2</span>
+                                    <span class="me-3">3</span>
+                                    <span class="me-3">4</span>
+                                    <span>5</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Albums section -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Albums</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div class="progress-bar" role="progressbar" style="width: 65%;" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div>
+                            <h6 class="mb-0">Album name</h6>
+                            <small class="text-muted">Artist</small>
+                        </div>
+                        <div>
+                            <span class="badge bg-secondary">65%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Artists section -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Artists</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div class="progress-bar" role="progressbar" style="width: 80%;" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div>
+                            <h6 class="mb-0">Artist name</h6>
+                            <small class="text-muted">Genre</small>
+                        </div>
+                        <div>
+                            <span class="badge bg-secondary">80%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Badges section -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Badges</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 d-flex justify-content-between">
+                            <div class="badge-circle"></div>
+                            <div class="badge-circle"></div>
+                            <div class="badge-circle"></div>
+                            <div class="badge-circle"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Activity feed with placeholders for comments -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Recent Activity</h5>
