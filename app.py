@@ -68,13 +68,14 @@ class User(UserMixin, db.Model):
         backref='following'
     )
 
-    def get_followers_count(self):
+    def followers(self):
         """
-        Returns the number of followers for the user.
+        Returns a query of followers for the user.
         """
-        return db.session.query(followers).filter(
-            (followers.c.followingId == self.userId)
-        ).count()
+        return db.session.query(User).join(
+            followers, 
+            (followers.c.followerId == User.userId)
+        ).filter(followers.c.followingId == self.userId)
 
     def get_id(self):
         return self.userId
@@ -107,7 +108,58 @@ class User(UserMixin, db.Model):
             self.followed.remove(user)
 
     def is_following(self, user):
-        return self.followed.filter(followers.c.followingId == user.userId).count() > 0
+        return db.session.query(followers).filter(
+        followers.c.followerId == self.userId,
+        followers.c.followingId == user.userId
+        ).count() > 0
+    
+class Post(db.Model):
+    __tablename__ = 'posts'
+    postId = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    userId = db.Column(db.String(36), db.ForeignKey('users.userId'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship with user
+    user = db.relationship('User', backref=db.backref('posts', lazy='dynamic'))
+    
+    # Relationship with likes and comments
+    likes = db.relationship('Like', primaryjoin='Post.postId==Like.postId', 
+                            backref='post', lazy='dynamic')
+    comments = db.relationship('Comment', primaryjoin='Post.postId==Comment.postId', 
+                               backref='post', lazy='dynamic')
+
+
+class Like(db.Model):
+    __tablename__ = 'likes'
+    likeId = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    userId = db.Column(db.String(36), db.ForeignKey('users.userId'), nullable=False)
+    postId = db.Column(db.String(36), db.ForeignKey('posts.postId'), nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='likes')
+
+
+class Comment(db.Model):
+    __tablename__ = 'comments'
+    commentId = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    userId = db.Column(db.String(36), db.ForeignKey('users.userId'), nullable=False)
+    postId = db.Column(db.String(36), db.ForeignKey('posts.postId'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='comments')
+
+# Add methods to User model
+def add_methods_to_user_model(User):
+    def has_liked_post(self, post):
+        return Like.query.filter_by(userId=self.userId, postId=post.postId).first() is not None
+    
+    User.has_liked_post = has_liked_post
+    return User
+
+User = add_methods_to_user_model(User)
 
 @app.template_filter('load_json')
 def load_json(value):
@@ -123,8 +175,15 @@ def load_user(user_id):
 # Routes
 @app.route('/')
 def index():
-    users = User.query.all()
-    return render_template('index.html', users=users)
+    if current_user.is_authenticated:
+        # Get posts from users the current user follows and their own posts
+        followed_user_ids = [user.userId for user in current_user.following] + [current_user.userId]
+        posts = Post.query.filter(Post.userId.in_(followed_user_ids)).order_by(Post.created_at.desc()).limit(10).all()
+    else:
+        # If not logged in, show recent posts from all users
+        posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
+    
+    return render_template('index.html', posts=posts)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -148,8 +207,8 @@ def register():
         
         # Handle profile picture upload
         profile_pic = 'default.jpg'
-        if 'profile_picture' in request.files:
-            file = request.files['profile_picture']
+        if 'profilePicture' in request.files:
+            file = request.files['profilePicture']
             if file.filename != '':
                 filename = secure_filename(file.filename)
                 file.save(os.path.join(PROFILE_PICS_FOLDER, filename))
@@ -177,11 +236,79 @@ def register():
 @login_required
 def create_post():
     if request.method == 'POST':
-        # This will be implemented later
-        flash('Post creation not implemented yet')
-        return redirect(url_for('profile', username=current_user.username))
+        content = request.form.get('content')
+        
+        if not content:
+            flash('Post content cannot be empty.')
+            return redirect(url_for('create_post'))
+        
+        # Create new post
+        new_post = Post(
+            userId=current_user.userId,
+            content=content
+        )
+        
+        db.session.add(new_post)
+        db.session.commit()
+        
+        flash('Post created successfully!')
+        return redirect(url_for('view_post', post_id=new_post.postId))
     
     return render_template('create_post.html')
+
+@app.route('/post/<post_id>')
+def view_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    return render_template('view_post.html', post=post, Comment=Comment)
+
+@app.route('/post/<post_id>/like', methods=['POST'])
+@login_required
+def like_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    
+    # Check if user has already liked the post
+    existing_like = Like.query.filter_by(
+        userId=current_user.userId, 
+        postId=post.postId
+    ).first()
+    
+    if existing_like:
+        # Unlike the post
+        db.session.delete(existing_like)
+        flash('Post unliked.')
+    else:
+        # Like the post
+        new_like = Like(
+            userId=current_user.userId,
+            postId=post.postId
+        )
+        db.session.add(new_like)
+        flash('Post liked.')
+    
+    db.session.commit()
+    return redirect(url_for('view_post', post_id=post_id))
+
+@app.route('/post/<post_id>/comment', methods=['POST'])
+@login_required
+def add_comment(post_id):
+    post = Post.query.get_or_404(post_id)
+    content = request.form.get('content')
+    
+    if not content:
+        flash('Comment cannot be empty.')
+        return redirect(url_for('view_post', post_id=post_id))
+    
+    new_comment = Comment(
+        userId=current_user.userId,
+        postId=post.postId,
+        content=content
+    )
+    
+    db.session.add(new_comment)
+    db.session.commit()
+    
+    flash('Comment added successfully!')
+    return redirect(url_for('view_post', post_id=post_id))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -208,7 +335,11 @@ def logout():
 @app.route('/profile/<username>')
 def profile(username):
     user = User.query.filter_by(username=username).first_or_404()
-    return render_template('profile.html', user=user)
+    
+    # Get posts only from the specific user
+    posts = Post.query.filter_by(userId=user.userId).order_by(Post.created_at.desc()).all()
+    
+    return render_template('profile.html', user=user, posts=posts)
 
 @app.route('/edit_profile', methods=['GET', 'POST'])
 @login_required
@@ -321,7 +452,7 @@ def debug_user(username):
     user_data = {
         'username': user.username,
         'email': user.email,
-        'profile_picture': user.profile_picture,
+        'profilePicture': user.profilePicture,
         'favorite_genre': user.favorite_genre,
         'bio': user.bio if hasattr(user, 'bio') else None,
         'song_picture': user.song_picture if hasattr(user, 'song_picture') else None,
