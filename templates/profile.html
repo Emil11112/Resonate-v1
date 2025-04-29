@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Profile{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12 mb-4">
+            <h1>Edit Your Profile</h1>
+            <p class="text-muted">Update your profile information and preferences</p>
+        </div>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
+        <div class="row">
+            <!-- Profile Basics -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}" readonly>
+                            <div class="form-text">Username cannot be changed</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ current_user.email }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="favorite_genre" class="form-label">Favorite Genre</label>
+                            <select class="form-select" id="favorite_genre" name="favorite_genre">
+                                <option value="">Select a genre</option>
+                                {% set genres = ['Rock', 'Pop', 'Metal', 'EDM', 'Hip Hop', 'Classical', 'Jazz', 'Country', 'R&B', 'Indie'] %}
+                                {% for genre in genres %}
+                                <option value="{{ genre }}" {% if genre == current_user.favorite_genre %}selected{% endif %}>{{ genre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="bio" class="form-label">Bio</label>
+                            <textarea class="form-control" id="bio" name="bio" rows="3">{{ current_user.bio or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Pictures & Media -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Profile Media</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <label class="form-label">Current Profile Picture</label>
+                            <div class="text-center mb-2">
+                                <div class="octagon-container">
+                                    <img src="{{ url_for('static', filename='profile_pics/' + current_user.profile_picture) }}" class="profile-pic" alt="Profile Picture">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="profile_picture" class="form-label">Change Profile Picture</label>
+                                <input class="form-control" type="file" id="profile_picture" name="profile_picture" accept="image/*">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="song_picture" class="form-label">Song of the Day Picture</label>
+                            <input class="form-control" type="file" id="song_picture" name="song_picture" accept="image/*">
+                            {% if current_user.song_picture %}
+                            <div class="mt-2">
+                                <img src="{{ url_for('static', filename='song_pics/' + current_user.song_picture) }}" class="img-thumbnail" style="max-width: 150px;" alt="Song Picture">
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Favorite Songs Section -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Favorite Songs</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="favorite-songs-container">
+                            {% for i in range(5) %}
+                            <div class="row mb-3 favorite-song-item">
+                                <div class="col-md-5">
+                                    <label class="form-label">Song Title</label>
+                                    <input type="text" class="form-control" name="song_title_{{ i }}" value="{{ current_user.favorite_songs[i].title if current_user.favorite_songs and i < current_user.favorite_songs|length else '' }}">
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label">Artist</label>
+                                    <input type="text" class="form-control" name="song_artist_{{ i }}" value="{{ current_user.favorite_songs[i].artist if current_user.favorite_songs and i < current_user.favorite_songs|length else '' }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Icon</label>
+                                    <select class="form-select" name="song_icon_{{ i }}">
+                                        {% set icons = ["💋", "📱", "👟", "⭐", "🎵", "🎸", "🎹", "🎷", "🎤", "🥁"] %}
+                                        {% for icon in icons %}
+                                        <option value="{{ icon }}" {% if current_user.favorite_songs and i < current_user.favorite_songs|length and current_user.favorite_songs[i].icon == icon %}selected{% endif %}>{{ icon }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Song of the Day Section -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Song of the Day</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="sotd_title" class="form-label">Song Title</label>
+                                    <input type="text" class="form-control" id="sotd_title" name="sotd_title" value="{{ current_user.sotd_title or '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="sotd_artist" class="form-label">Artist</label>
+                                    <input type="text" class="form-control" id="sotd_artist" name="sotd_artist" value="{{ current_user.sotd_artist or '' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12 text-end mb-4">
+                <a href="{{ url_for('profile', username=current_user.username) }}" class="btn btn-outline-secondary me-2">Cancel</a>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+    .octagon-container {
+        width: 160px;
+        height: 160px;
+        margin: 0 auto;
+        position: relative;
+        clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+        background-color: #f8f9fa;
+    }
+    
+    .profile-pic {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+</style>
+{% endblock %}
