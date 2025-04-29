@@ -43,6 +43,7 @@ followers = db.Table('followers',
 )
 
 # User Model - with all columns
+# User Model - simplified version
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -52,33 +53,12 @@ class User(UserMixin, db.Model):
     favorite_genre = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # New fields for enhanced profile
-    bio = db.Column(db.Text)
-    song_picture = db.Column(db.String(128))
-    sotd_title = db.Column(db.String(128))
-    sotd_artist = db.Column(db.String(128))
-    _favorite_songs = db.Column(db.Text)
-    
     # Define the relationship with followers
     followed = db.relationship(
         'User', secondary=followers,
         primaryjoin=(followers.c.follower_id == id),
         secondaryjoin=(followers.c.followed_id == id),
         backref=db.backref('followers', lazy='dynamic'), lazy='dynamic')
-    
-    # Properties for favorite_songs
-    @property
-    def favorite_songs(self):
-        if self._favorite_songs:
-            try:
-                return json.loads(self._favorite_songs)
-            except:
-                return []
-        return []
-     
-    @favorite_songs.setter
-    def favorite_songs(self, songs):
-        self._favorite_songs = json.dumps(songs)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -154,6 +134,16 @@ def register():
         return redirect(url_for('login'))
     
     return render_template('register.html')
+
+@app.route('/create_post', methods=['GET', 'POST'])
+@login_required
+def create_post():
+    if request.method == 'POST':
+        # This will be implemented later
+        flash('Post creation not implemented yet')
+        return redirect(url_for('profile', username=current_user.username))
+    
+    return render_template('create_post.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
