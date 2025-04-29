@@ -34,7 +34,7 @@
                         <img src="{{ url_for('static', filename='profile_pics/' + user.profilePicture) }}" class="profile-pic" alt="{{ user.username }}'s profile picture">
                     </div>
                     <h3 class="card-title">{{ user.username }}</h3>
-                    <div class="rating-circle mb-2">{{ user.followers().count() }}</div>
+                    <div class="rating-circle mb-2">{{ user.get_followers_count() }}</div>
                     <div class="user-info mb-3">
                         <p>{{ user.email }}</p>
                         <p>Favorite Genre: {{ user.favoriteGenres or 'Not specified' }}</p>
@@ -63,19 +63,19 @@
                 <div class="card-body">
                     <ul class="list-group list-group-flush">
                         {% if user.favorite_songs %}
-                            {% set songs = user.favorite_songs|default('[]')|load_json %}
-                            {% for song in songs %}
-                                <li class="list-group-item d-flex align-items-center">
-                                    <div class="circular-icon me-3">{{ song.icon }}</div>
-                                    <div>
-                                        <div class="fw-bold">{{ song.title }}</div>
-                                        <div class="text-muted">{{ song.artist }}</div>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        {% else %}
-                            <li class="list-group-item">No favorite songs added yet.</li>
-                        {% endif %}
+                        {% set songs = user.favorite_songs|default('[]')|load_json %}
+                        {% for song in songs %}
+                            <li class="list-group-item d-flex align-items-center">
+                                <div class="circular-icon me-3">{{ song.icon }}</div>
+                                <div>
+                                    <div class="fw-bold">{{ song.title }}</div>
+                                    <div class="text-muted">{{ song.artist }}</div>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    {% else %}
+                        <li class="list-group-item">No favorite songs added yet.</li>
+                    {% endif %}
                     </ul>
                 </div>
             </div>

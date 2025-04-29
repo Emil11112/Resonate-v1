@@ -61,12 +61,12 @@
                             <label class="form-label">Current Profile Picture</label>
                             <div class="text-center mb-2">
                                 <div class="octagon-container">
-                                    <img src="{{ url_for('static', filename='profile_pics/' + current_user.profile_picture) }}" class="profile-pic" alt="Profile Picture">
+                                    <img src="{{ url_for('static', filename='profile_pics/' + current_user.profilePicture) }}" class="profile-pic" alt="Profile Picture">
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label for="profile_picture" class="form-label">Change Profile Picture</label>
-                                <input class="form-control" type="file" id="profile_picture" name="profile_picture" accept="image/*">
+                                <label for="profilePicture" class="form-label">Change Profile Picture</label>
+                                <input class="form-control" type="file" id="profilePicture" name="profilePicture" accept="image/*">
                             </div>
                         </div>
 

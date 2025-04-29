@@ -68,12 +68,13 @@ class User(UserMixin, db.Model):
         backref='following'
     )
 
-    def followers(self):
+    def get_followers_count(self):
         """
-        Returns a query of followers for the user.
-        This mimics the .count() method used in the template.
+        Returns the number of followers for the user.
         """
-        return User.query.filter(User.following.contains(self))
+        return db.session.query(followers).filter(
+            (followers.c.followingId == self.userId)
+        ).count()
 
     def get_id(self):
         return self.userId
@@ -213,10 +214,10 @@ def profile(username):
 @login_required
 def edit_profile():
     if request.method == 'POST':
-        # Process form data
-        current_user.email = request.form['email']
-        current_user.favoriteGenres = request.form['favorite_genre']
-        current_user.bio = request.form.get('bio', '')
+        # Process basic profile information
+        current_user.email = request.form.get('email', current_user.email)
+        current_user.favoriteGenres = request.form.get('favorite_genre', current_user.favoriteGenres)
+        current_user.bio = request.form.get('bio', current_user.bio)
         
         # Process song of the day data
         current_user.sotd_title = request.form.get('sotd_title', '')
@@ -234,24 +235,24 @@ def edit_profile():
                 favorite_songs.append({
                     'title': title,
                     'artist': artist,
-                    'icon': icon
+                    'icon': icon or '🎵'  # Default icon if not provided
                 })
         
-        # Save favorite songs as a JSON string
+        # Save favorite songs as JSON string
         current_user.favorite_songs = json.dumps(favorite_songs) if favorite_songs else None
         
         # Handle profile picture upload
-        if 'profile_picture' in request.files and request.files['profile_picture'].filename:
-            file = request.files['profile_picture']
-            if file and allowed_file(file.filename):
+        if 'profilePicture' in request.files:
+            file = request.files['profilePicture']
+            if file and file.filename != '':
                 filename = secure_filename(f"{current_user.username}_{int(datetime.utcnow().timestamp())}_profile.{file.filename.rsplit('.', 1)[1].lower()}")
                 file.save(os.path.join(PROFILE_PICS_FOLDER, filename))
                 current_user.profilePicture = filename
         
         # Handle song picture upload
-        if 'song_picture' in request.files and request.files['song_picture'].filename:
+        if 'song_picture' in request.files:
             file = request.files['song_picture']
-            if file and allowed_file(file.filename):
+            if file and file.filename != '':
                 filename = secure_filename(f"{current_user.username}_{int(datetime.utcnow().timestamp())}_song.{file.filename.rsplit('.', 1)[1].lower()}")
                 file.save(os.path.join(SONG_PICS_FOLDER, filename))
                 current_user.song_picture = filename
