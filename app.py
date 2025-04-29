@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 import os
 import json
 from datetime import datetime
+import uuid  # Add this import for generating unique user IDs
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -36,35 +37,65 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Define the followers association table
 followers = db.Table('followers',
-    db.Column('follower_id', db.Integer, db.ForeignKey('user.id')),
-    db.Column('followed_id', db.Integer, db.ForeignKey('user.id'))
+    db.Column('followerId', db.String(36), db.ForeignKey('users.userId'), primary_key=True),
+    db.Column('followingId', db.String(36), db.ForeignKey('users.userId'), primary_key=True)
 )
 
-# User Model - with all columns
-# User Model - simplified version
 class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
+    __tablename__ = 'users'
+    userId = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
-    profile_picture = db.Column(db.String(120), default='default.jpg')
-    favorite_genre = db.Column(db.String(50), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    password = db.Column(db.String(128))
+    profilePicture = db.Column(db.String, nullable=True, default='default.jpg')
+    favoriteGenres = db.Column(db.String, nullable=True)
+    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Define the relationship with followers
-    followed = db.relationship(
-        'User', secondary=followers,
-        primaryjoin=(followers.c.follower_id == id),
-        secondaryjoin=(followers.c.followed_id == id),
-        backref=db.backref('followers', lazy='dynamic'), lazy='dynamic')
+    # Additional fields
+    bio = db.Column(db.Text, nullable=True)
+    sotd_title = db.Column(db.String(200), nullable=True)
+    sotd_artist = db.Column(db.String(200), nullable=True)
+    song_picture = db.Column(db.String(200), nullable=True)
+    favorite_songs = db.Column(db.String, nullable=True)
+
+    # Followers relationship
+    _followers = db.relationship(
+        'User', 
+        secondary='followers',
+        primaryjoin='User.userId==followers.c.followerId',
+        secondaryjoin='User.userId==followers.c.followingId',
+        backref='following'
+    )
+
+    def followers(self):
+        """
+        Returns a query of followers for the user.
+        This mimics the .count() method used in the template.
+        """
+        return User.query.filter(User.following.contains(self))
+
+    def get_id(self):
+        return self.userId
+
+    def __init__(self, username, email, password=None, **kwargs):
+        # Generate a UUID if not provided
+        self.userId = kwargs.get('userId', str(uuid.uuid4()))
+        self.username = username
+        self.email = email
+        if password:
+            self.set_password(password)
+        
+        # Set other attributes from kwargs
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
     
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        self.password = generate_password_hash(password)
         
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        return check_password_hash(self.password, password)
     
     def follow(self, user):
         if not self.is_following(user):
@@ -75,14 +106,18 @@ class User(UserMixin, db.Model):
             self.followed.remove(user)
 
     def is_following(self, user):
-        return self.followed.filter(followers.c.followed_id == user.id).count() > 0
+        return self.followed.filter(followers.c.followingId == user.userId).count() > 0
 
-    def __repr__(self):
-        return f'<User {self.username}>'
+@app.template_filter('load_json')
+def load_json(value):
+    try:
+        return json.loads(value) if value else []
+    except json.JSONDecodeError:
+        return []
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return User.query.get(user_id)
 
 # Routes
 @app.route('/')
@@ -111,20 +146,22 @@ def register():
             return redirect(url_for('register'))
         
         # Handle profile picture upload
+        profile_pic = 'default.jpg'
         if 'profile_picture' in request.files:
             file = request.files['profile_picture']
             if file.filename != '':
                 filename = secure_filename(file.filename)
                 file.save(os.path.join(PROFILE_PICS_FOLDER, filename))
                 profile_pic = filename
-            else:
-                profile_pic = 'default.jpg'
-        else:
-            profile_pic = 'default.jpg'
         
         # Create new user
-        new_user = User(username=username, email=email, profile_picture=profile_pic, favorite_genre=favorite_genre)
-        new_user.set_password(password)
+        new_user = User(
+            username=username, 
+            email=email, 
+            password=password,
+            profilePicture=profile_pic, 
+            favoriteGenres=favorite_genre
+        )
         
         # Add user to database
         db.session.add(new_user)
@@ -178,12 +215,12 @@ def edit_profile():
     if request.method == 'POST':
         # Process form data
         current_user.email = request.form['email']
-        current_user.favorite_genre = request.form['favorite_genre']
-        current_user.bio = request.form['bio']
+        current_user.favoriteGenres = request.form['favorite_genre']
+        current_user.bio = request.form.get('bio', '')
         
         # Process song of the day data
-        current_user.sotd_title = request.form['sotd_title']
-        current_user.sotd_artist = request.form['sotd_artist']
+        current_user.sotd_title = request.form.get('sotd_title', '')
+        current_user.sotd_artist = request.form.get('sotd_artist', '')
         
         # Process favorite songs
         favorite_songs = []
@@ -192,14 +229,16 @@ def edit_profile():
             artist = request.form.get(f'song_artist_{i}')
             icon = request.form.get(f'song_icon_{i}')
             
-            if title and artist:  # Only add if both title and artist are provided
+            # Only add if both title and artist are provided
+            if title and artist:
                 favorite_songs.append({
                     'title': title,
                     'artist': artist,
                     'icon': icon
                 })
         
-        current_user.favorite_songs = favorite_songs
+        # Save favorite songs as a JSON string
+        current_user.favorite_songs = json.dumps(favorite_songs) if favorite_songs else None
         
         # Handle profile picture upload
         if 'profile_picture' in request.files and request.files['profile_picture'].filename:
@@ -207,7 +246,7 @@ def edit_profile():
             if file and allowed_file(file.filename):
                 filename = secure_filename(f"{current_user.username}_{int(datetime.utcnow().timestamp())}_profile.{file.filename.rsplit('.', 1)[1].lower()}")
                 file.save(os.path.join(PROFILE_PICS_FOLDER, filename))
-                current_user.profile_picture = filename
+                current_user.profilePicture = filename
         
         # Handle song picture upload
         if 'song_picture' in request.files and request.files['song_picture'].filename:
@@ -235,9 +274,12 @@ def follow(username):
         flash('You cannot follow yourself!')
         return redirect(url_for('profile', username=username))
     
-    current_user.follow(user)
-    db.session.commit()
-    flash(f'You are now following {username}!')
+    # Check if already following
+    if user not in current_user.following:
+        current_user.following.append(user)
+        db.session.commit()
+        flash(f'You are now following {username}!')
+    
     return redirect(url_for('profile', username=username))
 
 @app.route('/unfollow/<username>')
@@ -250,6 +292,14 @@ def unfollow(username):
     if user == current_user:
         flash('You cannot unfollow yourself!')
         return redirect(url_for('profile', username=username))
+    
+    # Check if currently following
+    if user in current_user.following:
+        current_user.following.remove(user)
+        db.session.commit()
+        flash(f'You have unfollowed {username}.')
+    
+    return redirect(url_for('profile', username=username))
     
     current_user.unfollow(user)
     db.session.commit()

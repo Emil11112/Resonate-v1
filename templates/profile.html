@@ -12,10 +12,12 @@
                     {% if user.username == current_user.username %}
                     <a href="{{ url_for('edit_profile') }}" class="btn btn-outline-secondary me-2">Edit Profile</a>
                     {% else %}
-                    {% if current_user.is_authenticated and current_user.is_following(user) %}
-                    <a href="{{ url_for('unfollow', username=user.username) }}" class="btn btn-outline-secondary me-2">Unfollow</a>
-                    {% elif current_user.is_authenticated %}
-                    <a href="{{ url_for('follow', username=user.username) }}" class="btn btn-primary me-2">Follow</a>
+                    {% if current_user.is_authenticated %}
+                        {% if current_user.is_following(user) %}
+                        <a href="{{ url_for('unfollow', username=user.username) }}" class="btn btn-outline-secondary me-2">Unfollow</a>
+                        {% else %}
+                        <a href="{{ url_for('follow', username=user.username) }}" class="btn btn-primary me-2">Follow</a>
+                        {% endif %}
                     {% endif %}
                     {% endif %}
                 </div>
@@ -29,13 +31,13 @@
             <div class="card mb-4">
                 <div class="card-body text-center">
                     <div class="octagon-container mb-3">
-                        <img src="{{ url_for('static', filename='profile_pics/' + user.profile_picture) }}" class="profile-pic" alt="{{ user.username }}'s profile picture">
+                        <img src="{{ url_for('static', filename='profile_pics/' + user.profilePicture) }}" class="profile-pic" alt="{{ user.username }}'s profile picture">
                     </div>
                     <h3 class="card-title">{{ user.username }}</h3>
-                    <div class="rating-circle mb-2">{{ user.followers.count() }}</div>
+                    <div class="rating-circle mb-2">{{ user.followers().count() }}</div>
                     <div class="user-info mb-3">
                         <p>{{ user.email }}</p>
-                        <p>Favorite Genre: {{ user.favorite_genre or 'Not specified' }}</p>
+                        <p>Favorite Genre: {{ user.favoriteGenres or 'Not specified' }}</p>
                     </div>
                     
                     {% if user.bio %}
@@ -47,7 +49,7 @@
                     <div class="genre-badges mb-3">
                         {% set genres = ['Rock', 'Pop', 'Metal', 'EDM'] %}
                         {% for genre in genres %}
-                        <span class="badge {% if genre == user.favorite_genre %}bg-primary{% else %}bg-secondary{% endif %} me-1">{{ genre }}</span>
+                        <span class="badge {% if genre == user.favoriteGenres %}bg-primary{% else %}bg-secondary{% endif %} me-1">{{ genre }}</span>
                         {% endfor %}
                     </div>
                 </div>
@@ -61,7 +63,8 @@
                 <div class="card-body">
                     <ul class="list-group list-group-flush">
                         {% if user.favorite_songs %}
-                            {% for song in user.favorite_songs %}
+                            {% set songs = user.favorite_songs|default('[]')|load_json %}
+                            {% for song in songs %}
                                 <li class="list-group-item d-flex align-items-center">
                                     <div class="circular-icon me-3">{{ song.icon }}</div>
                                     <div>
@@ -191,3 +194,36 @@
             <div class="card mb-4">
                 <div class="card-header">
                     <h5>Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    <p>No recent activity.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .octagon-container {
+        width: 160px;
+        height: 160px;
+        margin: 0 auto;
+        position: relative;
+        clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+        background-color: #f8f9fa;
+    }
+    
+    .profile-pic {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .badge-circle {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: #6c757d;
+    }
+</style>
+{% endblock %}
