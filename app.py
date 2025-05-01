@@ -14,6 +14,10 @@ from dotenv import load_dotenv
 #Hämtar variabler från .env filen
 load_dotenv()
 
+SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+SPOTIFY_REDIRECT_URI = 'http://localhost:5000/spotify/callback'
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '1234567812312'  # Change this to a random secret key
@@ -28,14 +32,12 @@ SONG_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'song_pics')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # Spotify OAuth Configuration
-SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
-SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-SPOTIFY_REDIRECT_URI = 'http://localhost:5000/spotify/callback'
 SPOTIFY_SCOPES = [
-    'user-top-read', 
-    'user-read-recently-played', 
-    'user-library-read',
-    'playlist-read-private'
+    'user-read-private',  # Basic user info
+    'user-read-email',    # Email access
+    'user-top-read',      # Top tracks/artists
+    'user-library-read',  # User's saved tracks
+    'playlist-read-private'  # User's playlists
 ]
 
 # Make sure the upload folders exist
@@ -533,8 +535,9 @@ def spotify_connect():
     sp_oauth = SpotifyOAuth(
         client_id=SPOTIFY_CLIENT_ID,
         client_secret=SPOTIFY_CLIENT_SECRET,
-        redirect_uri=SPOTIFY_REDIRECT_URI,
-        scope=' '.join(SPOTIFY_SCOPES)
+        redirect_uri='http://localhost:5000/spotify/callback',
+        scope=' '.join(SPOTIFY_SCOPES),
+        show_dialog=True
     )
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
@@ -543,31 +546,52 @@ def spotify_connect():
 @login_required
 def spotify_callback():
     """Handle Spotify OAuth callback"""
-    sp_oauth = SpotifyOAuth(
-        client_id=SPOTIFY_CLIENT_ID,
-        client_secret=SPOTIFY_CLIENT_SECRET,
-        redirect_uri=SPOTIFY_REDIRECT_URI,
-        scope=' '.join(SPOTIFY_SCOPES)
-    )
-    
-    # Get the access token
-    code = request.args.get('code')
-    token_info = sp_oauth.get_access_token(code)
-    
-    # Create Spotify client
-    sp = spotipy.Spotify(auth=token_info['access_token'])
-    spotify_user = sp.current_user()
-    
-    # Update user's Spotify information
-    current_user.spotify_user_id = spotify_user['id']
-    current_user.spotify_access_token = token_info['access_token']
-    current_user.spotify_refresh_token = token_info.get('refresh_token')
-    current_user.spotify_token_expiry = datetime.utcnow() + timedelta(seconds=token_info['expires_in'])
-    
-    db.session.commit()
-    
-    flash('Successfully connected to Spotify!')
-    return redirect(url_for('profile', username=current_user.username))
+    try:
+        sp_oauth = SpotifyOAuth(
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET,
+            redirect_uri=SPOTIFY_REDIRECT_URI,
+            scope=' '.join(SPOTIFY_SCOPES)
+        )
+        
+        # Get the access token
+        code = request.args.get('code')
+        if not code:
+            flash('No authorization code found.', 'error')
+            return redirect(url_for('profile', username=current_user.username))
+
+        # Use get_access_token with error handling
+        token_info = sp_oauth.get_access_token(code, as_dict=True)
+        
+        if not token_info:
+            flash('Failed to retrieve access token.', 'error')
+            return redirect(url_for('profile', username=current_user.username))
+
+        # Create Spotify client
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+        
+        # Attempt to get current user's Spotify profile
+        spotify_user = sp.current_user()
+        
+        # Update user's Spotify information
+        current_user.spotify_user_id = spotify_user['id']
+        current_user.spotify_access_token = token_info['access_token']
+        current_user.spotify_refresh_token = token_info.get('refresh_token')
+        current_user.spotify_token_expiry = datetime.utcnow() + timedelta(seconds=token_info['expires_in'])
+        
+        db.session.commit()
+        
+        flash('Successfully connected to Spotify!', 'success')
+        return redirect(url_for('profile', username=current_user.username))
+
+    except Exception as e:
+        # Log the full error for debugging
+        print(f"Spotify Callback Error: {e}")
+        import traceback
+        print(traceback.format_exc())
+        
+        flash(f'An error occurred: {str(e)}', 'error')
+        return redirect(url_for('profile', username=current_user.username))
 
 @app.route('/spotify/disconnect')
 @login_required
