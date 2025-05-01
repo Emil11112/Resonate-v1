@@ -13,13 +13,14 @@
 
     <form method="POST" enctype="multipart/form-data">
         <div class="row">
-            <!-- Profile Basics -->
+            <!-- Profile Basics (existing code remains the same) -->
             <div class="col-md-6">
                 <div class="card mb-4">
                     <div class="card-header">
                         <h5>Basic Information</h5>
                     </div>
                     <div class="card-body">
+                        <!-- Existing basic information fields -->
                         <div class="mb-3">
                             <label for="username" class="form-label">Username</label>
                             <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}" readonly>
@@ -50,13 +51,14 @@
                 </div>
             </div>
 
-            <!-- Profile Pictures & Media -->
+            <!-- Profile Pictures & Media (existing code remains the same) -->
             <div class="col-md-6">
                 <div class="card mb-4">
                     <div class="card-header">
                         <h5>Profile Media</h5>
                     </div>
                     <div class="card-body">
+                        <!-- Existing profile picture and song picture upload -->
                         <div class="mb-4">
                             <label class="form-label">Current Profile Picture</label>
                             <div class="text-center mb-2">
@@ -81,11 +83,49 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- NEW: Spotify Connection Section -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Spotify Connection</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if current_user.spotify_user_id %}
+                            <div class="alert alert-success d-flex justify-content-between align-items-center">
+                                <span>
+                                    <i class="bi bi-spotify me-2"></i>
+                                    Connected as {{ current_user.spotify_user_id }}
+                                </span>
+                                <div>
+                                    <a href="{{ url_for('spotify_disconnect') }}" class="btn btn-outline-danger btn-sm me-2">
+                                        Disconnect
+                                    </a>
+                                    <form action="{{ url_for('spotify_sync_songs') }}" method="POST" class="d-inline">
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            Sync Favorite Songs
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-secondary">
+                                <p class="mb-3">
+                                    Connect your Spotify account to automatically import your favorite songs 
+                                    and get personalized music recommendations.
+                                </p>
+                                <a href="{{ url_for('spotify_connect') }}" class="btn btn-success">
+                                    <i class="bi bi-spotify me-2"></i>Connect Spotify
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Favorite Songs Section -->
+        <!-- Existing sections for Favorite Songs and Song of the Day -->
         <div class="row">
+            <!-- Favorite Songs Section -->
             <div class="col-md-12">
                 <div class="card mb-4">
                     <div class="card-header">
@@ -93,22 +133,28 @@
                     </div>
                     <div class="card-body">
                         <div class="favorite-songs-container">
+                            {% set favorite_songs = current_user.favorite_songs|load_json if current_user.favorite_songs else [] %}
                             {% for i in range(5) %}
                             <div class="row mb-3 favorite-song-item">
                                 <div class="col-md-5">
                                     <label class="form-label">Song Title</label>
-                                    <input type="text" class="form-control" name="song_title_{{ i }}" value="{{ current_user.favorite_songs[i].title if current_user.favorite_songs and i < current_user.favorite_songs|length else '' }}">
+                                    <input type="text" class="form-control" name="song_title_{{ i }}" 
+                                           value="{{ favorite_songs[i].title if i < favorite_songs|length else '' }}">
                                 </div>
                                 <div class="col-md-5">
                                     <label class="form-label">Artist</label>
-                                    <input type="text" class="form-control" name="song_artist_{{ i }}" value="{{ current_user.favorite_songs[i].artist if current_user.favorite_songs and i < current_user.favorite_songs|length else '' }}">
+                                    <input type="text" class="form-control" name="song_artist_{{ i }}" 
+                                           value="{{ favorite_songs[i].artist if i < favorite_songs|length else '' }}">
                                 </div>
                                 <div class="col-md-2">
                                     <label class="form-label">Icon</label>
                                     <select class="form-select" name="song_icon_{{ i }}">
                                         {% set icons = ["💋", "📱", "👟", "⭐", "🎵", "🎸", "🎹", "🎷", "🎤", "🥁"] %}
                                         {% for icon in icons %}
-                                        <option value="{{ icon }}" {% if current_user.favorite_songs and i < current_user.favorite_songs|length and current_user.favorite_songs[i].icon == icon %}selected{% endif %}>{{ icon }}</option>
+                                        <option value="{{ icon }}" 
+                                            {% if favorite_songs and i < favorite_songs|length and favorite_songs[i].icon == icon %}selected{% endif %}>
+                                            {{ icon }}
+                                        </option>
                                         {% endfor %}
                                     </select>
                                 </div>

@@ -13,6 +13,10 @@ class User(db.Model, UserMixin):
     profilePicture = db.Column(db.String, nullable=True, default='default.jpg')
     favoriteGenres = db.Column(db.PickleType, nullable=True)
     createdAt = db.Column(db.DateTime, default=db.func.current_timestamp())
+    spotify_access_token = db.Column(db.String(255), nullable=True)
+    spotify_refresh_token = db.Column(db.String(255), nullable=True)
+    spotify_user_id = db.Column(db.String(255), nullable=True)
+    spotify_token_expiry = db.Column(db.DateTime, nullable=True)
     
     # Add these methods for Flask-Login
     def get_id(self):

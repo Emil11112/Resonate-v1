@@ -5,8 +5,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid  # Add this import for generating unique user IDs
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -20,6 +22,17 @@ UPLOAD_FOLDER = 'static'
 PROFILE_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'profile_pics')
 SONG_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'song_pics')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Spotify OAuth Configuration
+SPOTIFY_CLIENT_ID = os.getenv('9c70f3a1e16c4ac4b264942728f1e8f4')
+SPOTIFY_CLIENT_SECRET = os.getenv('831dfb64cf3b489487b4487f9a82fb92')
+SPOTIFY_REDIRECT_URI = 'http://localhost:5000/spotify/callback'
+SPOTIFY_SCOPES = [
+    'user-top-read', 
+    'user-read-recently-played', 
+    'user-library-read',
+    'playlist-read-private'
+]
 
 # Make sure the upload folders exist
 os.makedirs(PROFILE_PICS_FOLDER, exist_ok=True)
@@ -51,6 +64,10 @@ class User(UserMixin, db.Model):
     profilePicture = db.Column(db.String, nullable=True, default='default.jpg')
     favoriteGenres = db.Column(db.String, nullable=True)
     createdAt = db.Column(db.DateTime, default=datetime.utcnow)
+    spotify_access_token = db.Column(db.String(255), nullable=True)
+    spotify_refresh_token = db.Column(db.String(255), nullable=True)
+    spotify_user_id = db.Column(db.String(255), nullable=True)
+    spotify_token_expiry = db.Column(db.DateTime, nullable=True)
     
     # Additional fields
     bio = db.Column(db.Text, nullable=True)
@@ -160,6 +177,190 @@ def add_methods_to_user_model(User):
     return User
 
 User = add_methods_to_user_model(User)
+
+class SpotifyService:
+    """Service for retrieving and processing Spotify user data"""
+    
+    @staticmethod
+    def get_top_tracks(user, time_range='medium_term', limit=10):
+        """
+        Retrieve user's top tracks from Spotify
+        
+        Args:
+            user (User): The Resonate user
+            time_range (str): 'short_term', 'medium_term', or 'long_term'
+            limit (int): Number of tracks to retrieve
+        
+        Returns:
+            list: Top tracks with detailed information
+        """
+        if not user.spotify_access_token:
+            return []
+        
+        try:
+            sp = spotipy.Spotify(auth=user.spotify_access_token)
+            top_tracks = sp.current_user_top_tracks(
+                limit=limit, 
+                time_range=time_range
+            )
+            
+            formatted_tracks = []
+            for track in top_tracks['items']:
+                formatted_tracks.append({
+                    'name': track['name'],
+                    'artist': track['artists'][0]['name'],
+                    'album': track['album']['name'],
+                    'album_art': track['album']['images'][0]['url'] if track['album']['images'] else None,
+                    'spotify_id': track['id'],
+                    'preview_url': track['preview_url'],
+                    'external_url': track['external_urls']['spotify']
+                })
+            
+            return formatted_tracks
+        except Exception as e:
+            print(f"Error fetching Spotify top tracks: {e}")
+            return []
+    
+    @staticmethod
+    def get_user_playlists(user, limit=10):
+        """
+        Retrieve user's Spotify playlists
+        
+        Args:
+            user (User): The Resonate user
+            limit (int): Number of playlists to retrieve
+        
+        Returns:
+            list: User's playlists
+        """
+        if not user.spotify_access_token:
+            return []
+        
+        try:
+            sp = spotipy.Spotify(auth=user.spotify_access_token)
+            playlists = sp.current_user_playlists(limit=limit)
+            
+            formatted_playlists = []
+            for playlist in playlists['items']:
+                formatted_playlists.append({
+                    'name': playlist['name'],
+                    'tracks_count': playlist['tracks']['total'],
+                    'spotify_id': playlist['id'],
+                    'external_url': playlist['external_urls']['spotify'],
+                    'image_url': playlist['images'][0]['url'] if playlist['images'] else None
+                })
+            
+            return formatted_playlists
+        except Exception as e:
+            print(f"Error fetching Spotify playlists: {e}")
+            return []
+        
+def refresh_spotify_token(user):
+    """
+    Refresh Spotify access token if it's expired
+    
+    Args:
+        user (User): The Resonate user
+    
+    Returns:
+        bool: Whether token was successfully refreshed
+    """
+    if not user.spotify_refresh_token:
+        return False
+    
+    try:
+        sp_oauth = SpotifyOAuth(
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET,
+            redirect_uri=SPOTIFY_REDIRECT_URI,
+            scope=' '.join(SPOTIFY_SCOPES)
+        )
+        
+        # Attempt to refresh the token
+        new_token = sp_oauth.refresh_access_token(user.spotify_refresh_token)
+        
+        # Update user's token information
+        user.spotify_access_token = new_token['access_token']
+        user.spotify_token_expiry = datetime.utcnow() + timedelta(seconds=new_token['expires_in'])
+        
+        if 'refresh_token' in new_token:
+            # If a new refresh token is provided, update it
+            user.spotify_refresh_token = new_token['refresh_token']
+        
+        db.session.commit()
+        return True
+    except Exception as e:
+        print(f"Error refreshing Spotify token: {e}")
+        return False
+
+def get_spotify_top_tracks(user):
+    """
+    Retrieve user's top Spotify tracks
+    
+    Args:
+        user (User): The user to fetch tracks for
+    
+    Returns:
+        list: Top tracks or empty list
+    """
+    if not user.spotify_access_token:
+        return []
+    
+    try:
+        sp = spotipy.Spotify(auth=user.spotify_access_token)
+        top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
+        
+        formatted_tracks = []
+        for track in top_tracks['items']:
+            formatted_tracks.append({
+                'name': track['name'],
+                'artist': track['artists'][0]['name'],
+                'album_art': track['album']['images'][0]['url'] if track['album']['images'] else None,
+                'external_url': track['external_urls']['spotify']
+            })
+        
+        return formatted_tracks
+    except Exception as e:
+        print(f"Error fetching top tracks: {e}")
+        return []
+    
+def get_spotify_playlists(user):
+    if not user.spotify_access_token:
+        return []
+        
+    try:
+        sp = spotipy.Spotify(auth=user.spotify_access_token)
+        playlists = sp.current_user_playlists(limit=6)
+            
+        formatted_playlists = []
+        for playlist in playlists['items']:
+            formatted_playlists.append({
+                'name': playlist['name'],
+                'tracks_count': playlist['tracks']['total'],
+                'external_url': playlist['external_urls']['spotify'],
+                'image_url': playlist['images'][0]['url'] if playlist['images'] else None
+            })
+            
+        return formatted_playlists
+    except Exception as e:
+        print(f"Error fetching playlists: {e}")
+        return []
+
+# Register these as template filters or context processors
+@app.context_processor
+def utility_processor():
+    def get_spotify_top_tracks(user):
+        # Implementation as above
+        pass
+    
+    def get_spotify_playlists(user):
+        # Implementation as above
+        pass
+    
+    return dict(
+        get_spotify_top_tracks=get_spotify_top_tracks,
+        get_spotify_playlists=get_spotify_playlists
+    )
 
 @app.template_filter('load_json')
 def load_json(value):
@@ -463,7 +664,139 @@ def debug_user(username):
     
     return f"<pre>{json.dumps(user_data, indent=4)}</pre>"
 
+@app.route('/spotify/connect')
+@login_required
+def spotify_connect():
+    """Initiate Spotify OAuth connection"""
+    sp_oauth = SpotifyOAuth(
+        client_id=SPOTIFY_CLIENT_ID,
+        client_secret=SPOTIFY_CLIENT_SECRET,
+        redirect_uri=SPOTIFY_REDIRECT_URI,
+        scope=' '.join(SPOTIFY_SCOPES)
+    )
+    auth_url = sp_oauth.get_authorize_url()
+    return redirect(auth_url)
+
+@app.route('/spotify/callback')
+@login_required
+def spotify_callback():
+    """Handle Spotify OAuth callback"""
+    sp_oauth = SpotifyOAuth(
+        client_id=SPOTIFY_CLIENT_ID,
+        client_secret=SPOTIFY_CLIENT_SECRET,
+        redirect_uri=SPOTIFY_REDIRECT_URI,
+        scope=' '.join(SPOTIFY_SCOPES)
+    )
+    
+    # Get the access token
+    code = request.args.get('code')
+    token_info = sp_oauth.get_access_token(code)
+    
+    # Create Spotify client
+    sp = spotipy.Spotify(auth=token_info['access_token'])
+    spotify_user = sp.current_user()
+    
+    # Update user's Spotify information
+    current_user.spotify_user_id = spotify_user['id']
+    current_user.spotify_access_token = token_info['access_token']
+    current_user.spotify_refresh_token = token_info.get('refresh_token')
+    current_user.spotify_token_expiry = datetime.utcnow() + timedelta(seconds=token_info['expires_in'])
+    
+    db.session.commit()
+    
+    flash('Successfully connected to Spotify!')
+    return redirect(url_for('profile', username=current_user.username))
+
+@app.route('/spotify/disconnect')
+@login_required
+def spotify_disconnect():
+    """Disconnect Spotify account"""
+    current_user.spotify_access_token = None
+    current_user.spotify_refresh_token = None
+    current_user.spotify_user_id = None
+    current_user.spotify_token_expiry = None
+    
+    db.session.commit()
+    
+    flash('Spotify account disconnected.')
+    return redirect(url_for('profile', username=current_user.username))
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+
+@app.route('/spotify/sync_songs', methods=['POST'])
+@login_required
+def spotify_sync_songs():
+    """Synchronize user's Spotify favorite songs to their profile"""
+    # Check if Spotify is connected
+    if not current_user.spotify_access_token:
+        flash('Please connect your Spotify account first.', 'error')
+        return redirect(url_for('edit_profile'))
+    
+    try:
+        # Create Spotify client
+        sp = spotipy.Spotify(auth=current_user.spotify_access_token)
+        
+        # Fetch user's top tracks
+        top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
+        
+        # Prepare favorite songs list
+        favorite_songs = []
+        for track in top_tracks['items']:
+            favorite_songs.append({
+                'title': track['name'],
+                'artist': track['artists'][0]['name'],
+                'icon': _get_track_emoji(track['name']),
+                'spotify_id': track['id']
+            })
+        
+        # Save to user profile
+        current_user.favorite_songs = json.dumps(favorite_songs)
+        db.session.commit()
+        
+        flash('Successfully synced Spotify songs!', 'success')
+    except Exception as e:
+        app.logger.error(f"Spotify song sync error: {str(e)}")
+        flash('Failed to sync Spotify songs. Please try again.', 'error')
+    
+    return redirect(url_for('edit_profile'))
+
+def _get_track_emoji(track_name):
+    """
+    Generate a fun emoji based on the track name
+    """
+    emojis = ['🎵', '🎸', '🎹', '🎤', '🥁', '🎷', '🎺', '🎼']
+    # Use a simple hash to consistently generate the same emoji for a track
+    return emojis[hash(track_name) % len(emojis)]
+
+@app.context_processor
+def spotify_context_processor():
+    """
+    Provide Spotify-related helper functions to templates
+    """
+    def get_spotify_top_tracks(user):
+        """
+        Retrieve user's top Spotify tracks
+        """
+        if not user.spotify_access_token:
+            return []
+        
+        try:
+            sp = spotipy.Spotify(auth=user.spotify_access_token)
+            top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
+            
+            formatted_tracks = []
+            for track in top_tracks['items']:
+                formatted_tracks.append({
+                    'name': track['name'],
+                    'artist': track['artists'][0]['name'],
+                    'album_art': track['album']['images'][0]['url'] if track['album']['images'] else None,
+                    'external_url': track['external_urls']['spotify']
+                })
+            
+            return formatted_tracks
+        except Exception as e:
+            print(f"Error fetching top tracks: {e}")
+            return []
