@@ -9,6 +9,10 @@ from datetime import datetime, timedelta
 import uuid  # Add this import for generating unique user IDs
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from dotenv import load_dotenv
+
+#Hämtar variabler från .env filen
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -24,8 +28,8 @@ SONG_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'song_pics')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # Spotify OAuth Configuration
-SPOTIFY_CLIENT_ID = os.getenv('9c70f3a1e16c4ac4b264942728f1e8f4')
-SPOTIFY_CLIENT_SECRET = os.getenv('831dfb64cf3b489487b4487f9a82fb92')
+SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
 SPOTIFY_REDIRECT_URI = 'http://localhost:5000/spotify/callback'
 SPOTIFY_SCOPES = [
     'user-top-read', 
@@ -234,7 +238,7 @@ def load_json(value):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(user_id)
+    return db.session.get(User, user_id)
 
 # Routes
 @app.route('/')
