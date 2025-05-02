@@ -9,8 +9,9 @@
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        <img src="{{ url_for('static', filename='profile_pics/' + post.user.profilePicture) }}" 
-                             class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                        <img src="{{ url_for('static', filename='profile_pics/' + user.profilePicture) }}" 
+                            class="profile-pic-small rounded-circle" 
+                            alt="{{ user.username }}'s profile picture">
                         <strong>{{ post.user.username }}</strong>
                     </div>
                     <small class="text-muted">{{ post.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>

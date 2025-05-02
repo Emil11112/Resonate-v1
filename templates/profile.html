@@ -144,7 +144,7 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4 text-center">
-                            <div class="octagon-container mb-3">
+                            <div class="profile-pic-container mb-3">
                                 <img src="{{ url_for('static', filename='profile_pics/' + user.profilePicture) }}" 
                                      class="profile-pic" 
                                      alt="{{ user.username }}'s profile picture">
@@ -274,13 +274,15 @@
 </div>
 
 <style>
-    .octagon-container {
+    /* Circular Profile Picture Styles */
+    .profile-pic-container {
         width: 160px;
         height: 160px;
+        border-radius: 50%;
+        overflow: hidden;
         margin: 0 auto;
-        position: relative;
-        clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
-        background-color: #f8f9fa;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 3px solid #f8f9fa;
     }
     
     .profile-pic {
