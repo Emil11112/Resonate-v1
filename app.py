@@ -74,6 +74,7 @@ class User(UserMixin, db.Model):
     spotify_refresh_token = db.Column(db.String(255), nullable=True)
     spotify_user_id = db.Column(db.String(255), nullable=True)
     spotify_token_expiry = db.Column(db.DateTime, nullable=True)
+
     
     # Additional fields
     bio = db.Column(db.Text, nullable=True)
@@ -629,7 +630,7 @@ def spotify_sync_songs():
             favorite_songs.append({
                 'title': track['name'],
                 'artist': track['artists'][0]['name'],
-                'icon': _get_track_emoji(track['name']),
+                'icon': User._get_track_emoji(track['name']),
                 'spotify_id': track['id']
             })
         
