@@ -27,37 +27,41 @@
     <div class="row">
         <div class="col-md-12">
             <h2>Recent Posts</h2>
-            {% for post in posts %}
+            {% for item in posts %}
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        <img src="{{ url_for('static', filename='profile_pics/' + user.profilePicture) }}" 
-                            class="profile-pic-small rounded-circle" 
-                            alt="{{ user.username }}'s profile picture">
-                        <strong>{{ post.user.username }}</strong>
+                        <img src="{{ url_for('static', filename='profile_pics/' + item.user.profilePicture) }}" 
+                            class="profile-pic-small rounded-circle me-2" 
+                            alt="{{ item.user.username }}'s profile picture">
+                        <strong>{{ item.user.username }}</strong>
                     </div>
-                    <small class="text-muted">{{ post.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
+                    <small class="text-muted">{{ item.post.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
                 </div>
                 <div class="card-body">
-                    <p>{{ post.content }}</p>
+                    <p>{{ item.post.content }}</p>
                 </div>
                 <div class="card-footer">
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('view_post', post_id=post.postId) }}" class="btn btn-link">
-                            <i class="bi bi-chat"></i> {{ post.comments.count() }} Comments
+                        <a href="{{ url_for('view_post', post_id=item.post.postId) }}" class="btn btn-link">
+                            <i class="bi bi-chat"></i> {{ item.post.comments.count() }} Comments
                         </a>
-                        <form method="POST" action="{{ url_for('like_post', post_id=post.postId) }}" class="d-inline">
+                        <form method="POST" action="{{ url_for('like_post', post_id=item.post.postId) }}" class="d-inline">
                             <button type="submit" class="btn btn-link">
-                                {% if current_user.has_liked_post(post) %}
+                                {% if current_user.has_liked_post(item.post) %}
                                     <i class="bi bi-heart-fill text-danger"></i>
                                 {% else %}
                                     <i class="bi bi-heart text-muted"></i>
                                 {% endif %}
-                                {{ post.likes.count() }} Likes
+                                {{ item.post.likes.count() }} Likes
                             </button>
                         </form>
                     </div>
                 </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info text-center">
+                No posts to show. Start following users or create your first post!
             </div>
             {% endfor %}
         </div>

@@ -254,7 +254,15 @@ def index():
         # If not logged in, show recent posts from all users
         posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
     
-    return render_template('index.html', posts=posts)
+    # Create a dictionary to map post IDs to users
+    posts_with_users = [
+        {
+            'post': post, 
+            'user': db.session.get(User, post.userId)  # Updated method
+        } for post in posts
+    ]
+    
+    return render_template('index.html', posts=posts_with_users)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -330,7 +338,7 @@ def create_post():
 @app.route('/post/<post_id>')
 def view_post(post_id):
     post = Post.query.get_or_404(post_id)
-    return render_template('view_post.html', post=post, Comment=Comment)
+    return render_template('view_post.html', post=post, Comment=Comment, user=post.user)
 
 @app.route('/post/<post_id>/like', methods=['POST'])
 @login_required
