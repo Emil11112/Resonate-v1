@@ -13,7 +13,7 @@
                     {% if not current_user.is_authenticated %}
                     <div>
                         <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg me-2">Sign Up</a>
-                        <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg">Log In</a>
+                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg me-2">Log In</a>
                     </div>
                     {% else %}
                     <a href="{{ url_for('create_post') }}" class="btn btn-primary btn-lg">Create a Post</a>
