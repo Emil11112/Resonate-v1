@@ -263,7 +263,9 @@ def index():
     
     return render_template('index.html', posts=posts_with_users)
 
+#Hanterar registrationen
 @app.route('/register', methods=['GET', 'POST'])
+# Posts kollar och processerar datan som vi har fått, get ger ett formulär för användaren att mata in.
 def register():
     if request.method == 'POST':
         username = request.form.get('username')
@@ -271,7 +273,7 @@ def register():
         password = request.form.get('password')
         favorite_genre = request.form.get('favorite_genre')
 
-        # Check if username or email already exists
+        # Vi kollar om användarnamnet eller mailen redan brukas någonstans
         user_exists = User.query.filter_by(username=username).first()
         email_exists = User.query.filter_by(email=email).first()
         
@@ -283,7 +285,7 @@ def register():
             flash('Email already exists.')
             return redirect(url_for('register'))
         
-        # Handle profile picture upload
+        # Hanterar profilbilden. Använder default.jpg om det inte finns någon annan.
         profile_pic = 'default.jpg'
         if 'profilePicture' in request.files:
             file = request.files['profilePicture']
@@ -292,7 +294,7 @@ def register():
                 file.save(os.path.join(PROFILE_PICS_FOLDER, filename))
                 profile_pic = filename
         
-        # Create new user
+        # Vi skapar en ny användare
         new_user = User(
             username=username, 
             email=email, 
@@ -301,81 +303,98 @@ def register():
             favoriteGenres=favorite_genre
         )
         
-        # Add user to database
+        # Lägger till användaren till databasen
         db.session.add(new_user)
         db.session.commit()
         
+        # Flash-notis som dyker upp lite snabbt bara på sidan
         flash('Registration successful! Please log in.')
         return redirect(url_for('login'))
     
     return render_template('register.html')
 
+# En route för att skapa en post
 @app.route('/create_post', methods=['GET', 'POST'])
 @login_required
+
 def create_post():
     if request.method == 'POST':
+        #Vi ber användaren att fylla i content
         content = request.form.get('content')
         
+        # Om det inte finns något content så kan man inte publicera
         if not content:
             flash('Post content cannot be empty.')
             return redirect(url_for('create_post'))
         
-        # Create new post
+        # Skapar en post
         new_post = Post(
             userId=current_user.userId,
             content=content
         )
         
+        # Commitar till databasen
         db.session.add(new_post)
         db.session.commit()
         
+        #Notis som dyker upp att det gick att posta
         flash('Post created successfully!')
         return redirect(url_for('view_post', post_id=new_post.postId))
     
     return render_template('create_post.html')
 
+# Route för att hantera post id och visa dess detaljer 
 @app.route('/post/<post_id>')
 def view_post(post_id):
     post = Post.query.get_or_404(post_id)
+    # Om sidan hittas så returneras det, annars skapar den en 404-sida att det inte fanns
     return render_template('view_post.html', post=post, Comment=Comment, user=post.user)
 
+#Hanterar hur likes funkar
 @app.route('/post/<post_id>/like', methods=['POST'])
 @login_required
 def like_post(post_id):
+    #Försöker hitta sidan annars blir det 404 sida
     post = Post.query.get_or_404(post_id)
     
-    # Check if user has already liked the post
+    # Kollar så inte den redan är gillad
     existing_like = Like.query.filter_by(
         userId=current_user.userId, 
         postId=post.postId
     ).first()
     
     if existing_like:
-        # Unlike the post
+        # Unlike:a posten
         db.session.delete(existing_like)
+        # Notis
         flash('Post unliked.')
     else:
-        # Like the post
+        # Like:a posten
         new_like = Like(
             userId=current_user.userId,
             postId=post.postId
         )
+        #Commitar till databasen
         db.session.add(new_like)
         flash('Post liked.')
     
     db.session.commit()
     return redirect(url_for('view_post', post_id=post_id))
 
+#Hanterar kommentarer, väldigt snarlik likes. 
 @app.route('/post/<post_id>/comment', methods=['POST'])
 @login_required
 def add_comment(post_id):
+    #Samma som för likes
     post = Post.query.get_or_404(post_id)
     content = request.form.get('content')
     
+    # Om användaren inte skrev in något i formuläret som skickades ovan så kan det inte publiceras.
     if not content:
         flash('Comment cannot be empty.')
         return redirect(url_for('view_post', post_id=post_id))
     
+    #Skapar kommentaren
     new_comment = Comment(
         userId=current_user.userId,
         postId=post.postId,
@@ -388,14 +407,18 @@ def add_comment(post_id):
     flash('Comment added successfully!')
     return redirect(url_for('view_post', post_id=post_id))
 
+#Hanterar hur man loggar in
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Här frågar vi efter username och lösen
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         
+        #Försöker hitta användarenamnet i databasen
         user = User.query.filter_by(username=username).first()
         
+        #Om användaren finns och lösenordet stämmer med det sparade så returneras du till profilsidan, annars felmeddelande
         if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('profile', username=user.username))
@@ -404,53 +427,58 @@ def login():
     
     return render_template('login.html')
 
+# Här kan man logga ut
 @app.route('/logout')
 @login_required
 def logout():
+    # Hänvisar till logout_user funktionen
     logout_user()
     return redirect(url_for('index'))
 
+#För användarens profilsida
 @app.route('/profile/<username>')
 def profile(username):
+    #Försöker hitta användaren eller 404-sida att det inte fanns. 
     user = User.query.filter_by(username=username).first_or_404()
     
-    # Get posts only from the specific user
+    # Här hämtar vi alla posts från bara användaren
     posts = Post.query.filter_by(userId=user.userId).order_by(Post.created_at.desc()).all()
     
     return render_template('profile.html', user=user, posts=posts)
 
+#För att redigera profilen
 @app.route('/edit_profile', methods=['GET', 'POST'])
 @login_required
 def edit_profile():
     if request.method == 'POST':
-        # Process basic profile information
+        # Här processeras användardatan
         current_user.email = request.form.get('email', current_user.email)
         current_user.favoriteGenres = request.form.get('favorite_genre', current_user.favoriteGenres)
         current_user.bio = request.form.get('bio', current_user.bio)
         
-        # Process song of the day data
+        # processeras datan för song of the day
         current_user.sotd_title = request.form.get('sotd_title', '')
         current_user.sotd_artist = request.form.get('sotd_artist', '')
         
-        # Process favorite songs
+        # Processerar favorite songs
         favorite_songs = []
-        for i in range(5):  # We have 5 song slots
+        for i in range(5):  # MAX 5 låtar
             title = request.form.get(f'song_title_{i}')
             artist = request.form.get(f'song_artist_{i}')
             icon = request.form.get(f'song_icon_{i}')
             
-            # Only add if both title and artist are provided
+            # Lägger bara till om låtnamn och artist finns med
             if title and artist:
                 favorite_songs.append({
                     'title': title,
                     'artist': artist,
-                    'icon': icon or '🎵'  # Default icon if not provided
+                    'icon': icon or '🎵'  # Default icon om inget annat ges
                 })
         
-        # Save favorite songs as JSON string
+        # Vi sparar favoritlåtarna som en json
         current_user.favorite_songs = json.dumps(favorite_songs) if favorite_songs else None
         
-        # Handle profile picture upload
+        # Här hanterar vi profilbilden i alla steg. Hur den hämtas och kollas att den funkar.
         if 'profilePicture' in request.files:
             file = request.files['profilePicture']
             if file and file.filename != '':
@@ -458,7 +486,7 @@ def edit_profile():
                 file.save(os.path.join(PROFILE_PICS_FOLDER, filename))
                 current_user.profilePicture = filename
         
-        # Handle song picture upload
+        # Hanterar song picture på samma sätt
         if 'song_picture' in request.files:
             file = request.files['song_picture']
             if file and file.filename != '':
@@ -466,25 +494,29 @@ def edit_profile():
                 file.save(os.path.join(SONG_PICS_FOLDER, filename))
                 current_user.song_picture = filename
         
-        # Save changes to database
+        # Sparar ändringarna i databasen
         db.session.commit()
         flash('Your profile has been updated!')
         return redirect(url_for('profile', username=current_user.username))
     
     return render_template('edit_profile.html')
 
+# Hur man följer en användare
 @app.route('/follow/<username>')
 @login_required
 def follow(username):
+    #Försöker hämta användaren i databasen
     user = User.query.filter_by(username=username).first()
+    #Om den inte finns så ska det bli felmeddelande
     if user is None:
         flash(f'User {username} not found.')
         return redirect(url_for('index'))
+    # Du ska inte kunna följa dig själv heller
     if user == current_user:
         flash('You cannot follow yourself!')
         return redirect(url_for('profile', username=username))
     
-    # Check if already following
+    # Om du inte redan följer människan så gör du det nu och uppdaterar databasen
     if user not in current_user.following:
         current_user.following.append(user)
         db.session.commit()
@@ -492,9 +524,11 @@ def follow(username):
     
     return redirect(url_for('profile', username=username))
 
+#Avföljer ett konto på snarlikt sätt
 @app.route('/unfollow/<username>')
 @login_required
 def unfollow(username):
+    #Försöker hitta användaren och kolla så att den finns och inte är du
     user = User.query.filter_by(username=username).first()
     if user is None:
         flash(f'User {username} not found.')
@@ -503,7 +537,7 @@ def unfollow(username):
         flash('You cannot unfollow yourself!')
         return redirect(url_for('profile', username=username))
     
-    # Check if currently following
+    # kollar om du följer människan, annars görs inget.
     if user in current_user.following:
         current_user.following.remove(user)
         db.session.commit()
@@ -511,35 +545,17 @@ def unfollow(username):
     
     return redirect(url_for('profile', username=username))
 
+# Här hämtar vi datan för ALLA människor och skickar till Users-sidan där man kan se alla konton.
 @app.route('/users')
 def users():
     users = User.query.all()
     return render_template('users.html', users=users)
 
-@app.route('/debug/<username>')
-def debug_user(username):
-    """Debug route to check user data"""
-    user = User.query.filter_by(username=username).first_or_404()
-    
-    # Get all attributes of the user object
-    user_data = {
-        'username': user.username,
-        'email': user.email,
-        'profilePicture': user.profilePicture,
-        'favorite_genre': user.favorite_genre,
-        'bio': user.bio if hasattr(user, 'bio') else None,
-        'song_picture': user.song_picture if hasattr(user, 'song_picture') else None,
-        'sotd_title': user.sotd_title if hasattr(user, 'sotd_title') else None,
-        'sotd_artist': user.sotd_artist if hasattr(user, 'sotd_artist') else None,
-        'favorite_songs': user.favorite_songs if hasattr(user, 'favorite_songs') else []
-    }
-    
-    return f"<pre>{json.dumps(user_data, indent=4)}</pre>"
-
+# Här under har vi allt med vår Spotify koppling
 @app.route('/spotify/connect')
 @login_required
 def spotify_connect():
-    """Initiate Spotify OAuth connection"""
+    """Startar Spotify OAuth connection"""
     sp_oauth = SpotifyOAuth(
         client_id=SPOTIFY_CLIENT_ID,
         client_secret=SPOTIFY_CLIENT_SECRET,
@@ -550,10 +566,10 @@ def spotify_connect():
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
 
+#Här hanterar vi vad vi gör med callbacken
 @app.route('/spotify/callback')
 @login_required
 def spotify_callback():
-    """Handle Spotify OAuth callback"""
     try:
         sp_oauth = SpotifyOAuth(
             client_id=SPOTIFY_CLIENT_ID,
@@ -562,26 +578,26 @@ def spotify_callback():
             scope=' '.join(SPOTIFY_SCOPES)
         )
         
-        # Get the access token
+        # Vi kollar om vi har fått en token
         code = request.args.get('code')
         if not code:
             flash('No authorization code found.', 'error')
             return redirect(url_for('profile', username=current_user.username))
 
-        # Use get_access_token with error handling
+        # Vi tar fram datan från token:en och har lite felhantering
         token_info = sp_oauth.get_access_token(code, as_dict=True)
         
         if not token_info:
             flash('Failed to retrieve access token.', 'error')
             return redirect(url_for('profile', username=current_user.username))
 
-        # Create Spotify client
+        # Vi skapar en Spotify client med token:en
         sp = spotipy.Spotify(auth=token_info['access_token'])
         
-        # Attempt to get current user's Spotify profile
+        # Hämtar användarens playlists.
         spotify_user = sp.current_user()
         
-        # Update user's Spotify information
+        # Updaterar användarens Spotify information
         current_user.spotify_user_id = spotify_user['id']
         current_user.spotify_access_token = token_info['access_token']
         current_user.spotify_refresh_token = token_info.get('refresh_token')
@@ -591,7 +607,8 @@ def spotify_callback():
         
         flash('Successfully connected to Spotify!', 'success')
         return redirect(url_for('profile', username=current_user.username))
-
+    
+    #Felhantering
     except Exception as e:
         # Log the full error for debugging
         print(f"Spotify Callback Error: {e}")
@@ -601,10 +618,11 @@ def spotify_callback():
         flash(f'An error occurred: {str(e)}', 'error')
         return redirect(url_for('profile', username=current_user.username))
 
+#Disconnectar Spotify
 @app.route('/spotify/disconnect')
 @login_required
 def spotify_disconnect():
-    """Disconnect Spotify account"""
+    #Rensar all data så att användaren blir utloggad
     current_user.spotify_access_token = None
     current_user.spotify_refresh_token = None
     current_user.spotify_user_id = None
@@ -615,23 +633,25 @@ def spotify_disconnect():
     flash('Spotify account disconnected.')
     return redirect(url_for('profile', username=current_user.username))
 
+#Synkar låtarna från Spotify
 @app.route('/spotify/sync_songs', methods=['POST'])
 @login_required
 def spotify_sync_songs():
-    """Synchronize user's Spotify favorite songs to their profile"""
-    # Check if Spotify is connected
+    # Tar användarens favoritlåtar
+
+    # Kollar så att användaren är inloggad och har en token
     if not current_user.spotify_access_token:
         flash('Please connect your Spotify account first.', 'error')
         return redirect(url_for('edit_profile'))
     
     try:
-        # Create Spotify client
+        # Skapar en Spotify Client
         sp = spotipy.Spotify(auth=current_user.spotify_access_token)
         
-        # Fetch user's top tracks
+        # Fetchar 5 favoritlåtar
         top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
         
-        # Prepare favorite songs list
+        # Förbereder en lista med favoritlåtarna
         favorite_songs = []
         for track in top_tracks['items']:
             favorite_songs.append({
@@ -640,7 +660,7 @@ def spotify_sync_songs():
                 'spotify_id': track['id']
             })
         
-        # Save to user profile
+        # Sparar detta 
         current_user.favorite_songs = json.dumps(favorite_songs)
         db.session.commit()
         
