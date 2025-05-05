@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 import os
 import json
 from datetime import datetime, timedelta
-import uuid  # Add this import for generating unique user IDs
+import uuid  
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
@@ -14,24 +14,25 @@ from dotenv import load_dotenv
 #Hämtar variabler från .env filen
 load_dotenv()
 
+#Konfigurerar Spotifys API
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
 SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
 SPOTIFY_REDIRECT_URI = 'http://localhost:5000/spotify/callback'
 
-# Initialize Flask app
+# Startar flask-appen
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '1234567812312'  # Change this to a random secret key
+app.config['SECRET_KEY'] = '1234567812312'  # Slängde in lite random siffror som blir vår client-secret
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
 
-# File upload configurations
+# File upload konfiguration
 UPLOAD_FOLDER = 'static'
 PROFILE_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'profile_pics')
 SONG_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'song_pics')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-# Spotify OAuth Configuration
+# Spotify OAuth konfig
 SPOTIFY_SCOPES = [
     'user-read-private',  # Basic user info
     'user-read-email',    # Email access
@@ -40,27 +41,31 @@ SPOTIFY_SCOPES = [
     'playlist-read-private'  # User's playlists
 ]
 
-# Make sure the upload folders exist
+# Vi kollar att uppladdnings konfigen finns
 os.makedirs(PROFILE_PICS_FOLDER, exist_ok=True)
 os.makedirs(SONG_PICS_FOLDER, exist_ok=True)
 
-# Function to check if file extension is allowed
+# Funktion som kollar om filen är i korrekt format
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Initialize SQLAlchemy
+# startar SQLAlchemy
 db = SQLAlchemy(app)
 
-# Initialize Flask-Login
+# startar Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+ # Här under så definierar vi databasen
+
+ # Först ut så är tabellen för followers, med ID för den som följer och blir följd.
 followers = db.Table('followers',
     db.Column('followerId', db.String(36), db.ForeignKey('users.userId'), primary_key=True),
     db.Column('followingId', db.String(36), db.ForeignKey('users.userId'), primary_key=True)
 )
 
+# Allt som sparas i databasen för en User
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     userId = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -74,16 +79,13 @@ class User(UserMixin, db.Model):
     spotify_refresh_token = db.Column(db.String(255), nullable=True)
     spotify_user_id = db.Column(db.String(255), nullable=True)
     spotify_token_expiry = db.Column(db.DateTime, nullable=True)
-
-    
-    # Additional fields
     bio = db.Column(db.Text, nullable=True)
     sotd_title = db.Column(db.String(200), nullable=True)
     sotd_artist = db.Column(db.String(200), nullable=True)
     song_picture = db.Column(db.String(200), nullable=True)
     favorite_songs = db.Column(db.String, nullable=True)
 
-    # Followers relationship
+    # Followers relationen
     _followers = db.relationship(
         'User', 
         secondary='followers',
@@ -92,31 +94,35 @@ class User(UserMixin, db.Model):
         backref='following'
     )
 
+    # Funktionen ska returnera vilka som följer en
     def followers(self):
-        """
-        Returns a query of followers for the user.
-        """
+        
         return db.session.query(User).join(
             followers, 
             (followers.c.followerId == User.userId)
         ).filter(followers.c.followingId == self.userId)
-
+    
+    # Hämtar id:et för en användare
     def get_id(self):
         return self.userId
 
+
     def __init__(self, username, email, password=None, **kwargs):
-        # Generate a UUID if not provided
+        # ETT UUID genereras om inte det finns
         self.userId = kwargs.get('userId', str(uuid.uuid4()))
+        
+        #Grundläggande information tilldelas och om ett lösen finns så hashas det.
         self.username = username
         self.email = email
         if password:
             self.set_password(password)
         
-        # Set other attributes from kwargs
+        # Här kollar vi på attributen som skickats med och lägger till de som redan finns i klassen
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
     
+    # Dessa är ganska självklara
     def set_password(self, password):
         self.password = generate_password_hash(password)
         
@@ -137,7 +143,7 @@ class User(UserMixin, db.Model):
         followers.c.followingId == user.userId
         ).count() > 0
     
-    
+    # Tabell i databasen för posts
 class Post(db.Model):
     __tablename__ = 'posts'
     postId = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -145,26 +151,26 @@ class Post(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relationship with user
+    # Relationen med user
     user = db.relationship('User', backref=db.backref('posts', lazy='dynamic'))
     
-    # Relationship with likes and comments
+    # Relation med likes och comments
     likes = db.relationship('Like', primaryjoin='Post.postId==Like.postId', 
                             backref='post', lazy='dynamic')
     comments = db.relationship('Comment', primaryjoin='Post.postId==Comment.postId', 
                                backref='post', lazy='dynamic')
 
-
+# Tabell för likes
 class Like(db.Model):
     __tablename__ = 'likes'
     likeId = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     userId = db.Column(db.String(36), db.ForeignKey('users.userId'), nullable=False)
     postId = db.Column(db.String(36), db.ForeignKey('posts.postId'), nullable=False)
     
-    # Relationships
+    # Relation med user
     user = db.relationship('User', backref='likes')
 
-
+# Tabell för kommentarer
 class Comment(db.Model):
     __tablename__ = 'comments'
     commentId = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -173,29 +179,24 @@ class Comment(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relationships
+    # Relation
     user = db.relationship('User', backref='comments')
 
-# Add methods to User model
+# Lägger dynamiskt till nya metoder
 def add_methods_to_user_model(User):
+    # Om en användare gillar ett inlägg så kollar den upp i databasen efter userid, postid och om det hittas blir det en like, annars none.
     def has_liked_post(self, post):
         return Like.query.filter_by(userId=self.userId, postId=post.postId).first() is not None
     
     User.has_liked_post = has_liked_post
     return User
 
+#Metod tillägget appliceras här
 User = add_methods_to_user_model(User)
          
+#Refreshar Spotifys token om den har gått ut. Returnerar en bool om den byttes succesfully.         
 def refresh_spotify_token(user):
-    """
-    Refresh Spotify access token if it's expired
-    
-    Args:
-        user (User): The Resonate user
-    
-    Returns:
-        bool: Whether token was successfully refreshed
-    """
+  
     if not user.spotify_refresh_token:
         return False
     
@@ -207,10 +208,10 @@ def refresh_spotify_token(user):
             scope=' '.join(SPOTIFY_SCOPES)
         )
         
-        # Attempt to refresh the token
+        # Försöker refresh:a token
         new_token = sp_oauth.refresh_access_token(user.spotify_refresh_token)
         
-        # Update user's token information
+        # Uppdaterar användarens token information
         user.spotify_access_token = new_token['access_token']
         user.spotify_token_expiry = datetime.utcnow() + timedelta(seconds=new_token['expires_in'])
         
@@ -228,34 +229,35 @@ def refresh_spotify_token(user):
 
 
 
-
+# Här så försöker vi konvertera en JSON-sträng till en lista, om det inte går blir det en tom lista.
 @app.template_filter('load_json')
 def load_json(value):
     try:
         return json.loads(value) if value else []
     except json.JSONDecodeError:
         return []
-
+# Hämtar en användare baserat på user_id från databasen
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, user_id)
 
-# Routes
+# Route-handlers 
 @app.route('/')
 def index():
+    # Här leds man till homepagen där vi har recent posts och man kan logga in
     if current_user.is_authenticated:
-        # Get posts from users the current user follows and their own posts
+        # Hämtar posts från andra och sig själv
         followed_user_ids = [user.userId for user in current_user.following] + [current_user.userId]
         posts = Post.query.filter(Post.userId.in_(followed_user_ids)).order_by(Post.created_at.desc()).limit(10).all()
     else:
-        # If not logged in, show recent posts from all users
+        # Om du inte är inloggad ser du posts från alla
         posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
     
-    # Create a dictionary to map post IDs to users
+    # Vi använder en dictionary för att koppla posts till användare
     posts_with_users = [
         {
             'post': post, 
-            'user': db.session.get(User, post.userId)  # Updated method
+            'user': db.session.get(User, post.userId)  
         } for post in posts
     ]
     
