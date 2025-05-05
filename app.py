@@ -137,9 +137,6 @@ class User(UserMixin, db.Model):
         followers.c.followingId == user.userId
         ).count() > 0
     
-    def _get_track_emoji(track_name):
-        emojis = ['🎵', '🎸', '🎹', '🎤', '🥁', '🎷', '🎺', '🎼']
-        return emojis[hash(track_name) % len(emojis)]
     
 class Post(db.Model):
     __tablename__ = 'posts'
@@ -638,7 +635,6 @@ def spotify_sync_songs():
             favorite_songs.append({
                 'title': track['name'],
                 'artist': track['artists'][0]['name'],
-                'icon': User._get_track_emoji(track['name']),
                 'spotify_id': track['id']
             })
         
