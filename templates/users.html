@@ -3,11 +3,11 @@
 {% block title %}Browse Users{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container mt-5">
     <div class="row">
-        <div class="col-md-12 mb-4">
-            <h1>Browse Users</h1>
-            <p class="text-muted">Discover and connect with other music lovers</p>
+        <div class="col-md-12 mb-5">
+            <h1 class="display-5 fw-bold">Browse Users</h1>
+            <p class="lead text-muted">Discover and connect with other music lovers</p>
         </div>
     </div>
     
@@ -16,9 +16,9 @@
         <div class="col-md-4 mb-4">
             <div class="card h-100">
                 <div class="card-body text-center">
-                    <div class="mb-3">
+                    <div class="mb-3" style="display: flex; justify-content: center;">
                         <img src="{{ url_for('static', filename='profile_pics/' + user.profilePicture) }}" 
-                            class="profile-pic-small rounded-circle" 
+                            class="profile-pic-small" 
                             alt="{{ user.username }}'s profile picture">
                     </div>
                     <h5 class="card-title">{{ user.username }}</h5>
