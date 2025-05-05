@@ -3,7 +3,7 @@ from flask_login import UserMixin
 
 db = SQLAlchemy()
 
-# 1️⃣ Users Table
+# Tabell för användaren
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
     userId = db.Column(db.String, primary_key=True)
@@ -18,7 +18,7 @@ class User(db.Model, UserMixin):
     spotify_user_id = db.Column(db.String(255), nullable=True)
     spotify_token_expiry = db.Column(db.DateTime, nullable=True)
     
-    # Add these methods for Flask-Login
+    # För inloggning
     def get_id(self):
         return self.userId
     
@@ -31,13 +31,13 @@ class User(db.Model, UserMixin):
     def is_anonymous(self):
         return False
 
-# 2️⃣ Followers Table
+# Tabell för följare
 class Follower(db.Model):
     __tablename__ = 'followers'
     followerId = db.Column(db.String, db.ForeignKey('users.userId'), primary_key=True)
     followingId = db.Column(db.String, db.ForeignKey('users.userId'), primary_key=True)
 
-# 3️⃣ Posts Table
+# Tabell för posts
 class Post(db.Model):
     __tablename__ = 'posts'
     postId = db.Column(db.String, primary_key=True)
@@ -47,14 +47,14 @@ class Post(db.Model):
     likes = db.Column(db.Integer, default=0)
     createdAt = db.Column(db.DateTime, default=db.func.current_timestamp())
 
-# 4️⃣ Likes Table
+# Tabell för gilla-markeringar
 class Like(db.Model):
     __tablename__ = 'likes'
     likeId = db.Column(db.String, primary_key=True)
     userId = db.Column(db.String, db.ForeignKey('users.userId'), nullable=False)
     postId = db.Column(db.String, db.ForeignKey('posts.postId'), nullable=False)
 
-# 5️⃣ Comments Table
+# Tabell för kommentarer
 class Comment(db.Model):
     __tablename__ = 'comments'
     commentId = db.Column(db.String, primary_key=True)
@@ -63,7 +63,7 @@ class Comment(db.Model):
     content = db.Column(db.Text, nullable=False)
     createdAt = db.Column(db.DateTime, default=db.func.current_timestamp())
 
-# 6️⃣ Songs Table
+# Tabell för sånger
 class Song(db.Model):
     __tablename__ = 'songs'
     songId = db.Column(db.String, primary_key=True)

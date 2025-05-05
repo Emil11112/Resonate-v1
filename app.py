@@ -655,16 +655,17 @@ def spotify_context_processor():
     Provide Spotify-related helper functions to templates
     """
     def get_spotify_top_tracks(user):
-        """
-        Retrieve user's top Spotify tracks
-        """
+        
+        #Kollar om användaren inte är inloggad, returnerar tom lista isåfall
         if not user.spotify_access_token:
             return []
         
+        #Försöker skapa en Spotify client och hämta deras 5 top tracks
         try:
             sp = spotipy.Spotify(auth=user.spotify_access_token)
             top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
             
+            #Lägger låtarna i en lista
             formatted_tracks = []
             for track in top_tracks['items']:
                 formatted_tracks.append({
@@ -680,12 +681,12 @@ def spotify_context_processor():
             return []
 
     def get_spotify_playlists(user):
-        """
-        Retrieve user's Spotify playlists
-        """
+        
+        #Kollar likadant här om användaren är inloggad och har en token
         if not user.spotify_access_token:
             return []
         
+        #Försöker göra en Spotify Client och hämta max 6 spellistor
         try:
             sp = spotipy.Spotify(auth=user.spotify_access_token)
             playlists = sp.current_user_playlists(limit=6)
@@ -703,14 +704,12 @@ def spotify_context_processor():
         except Exception as e:
             print(f"Error fetching playlists: {e}")
             return []
-
+        
+    #Kallar och returnerar resultatet av dessa funktioner
     return dict(
         get_spotify_top_tracks=get_spotify_top_tracks,
         get_spotify_playlists=get_spotify_playlists
     )
-
-
-
 
 # FÖR ATT KÖRA PROGRAMMET
 if __name__ == '__main__':
