@@ -451,34 +451,34 @@ def profile(username):
 @login_required
 def edit_profile():
     if request.method == 'POST':
-        # Här processeras användardatan
+        # Uppdatera grundläggande profilinformation
         current_user.email = request.form.get('email', current_user.email)
         current_user.favoriteGenres = request.form.get('favorite_genre', current_user.favoriteGenres)
         current_user.bio = request.form.get('bio', current_user.bio)
         
-        # processeras datan för song of the day
+        # Uppdatera Song of the Day
         current_user.sotd_title = request.form.get('sotd_title', '')
         current_user.sotd_artist = request.form.get('sotd_artist', '')
         
-        # Processerar favorite songs
+        # Hantera favoritlåtar
         favorite_songs = []
-        for i in range(5):  # MAX 5 låtar
+        for i in range(5):  # 5 låtplatser
             title = request.form.get(f'song_title_{i}')
             artist = request.form.get(f'song_artist_{i}')
             icon = request.form.get(f'song_icon_{i}')
             
-            # Lägger bara till om låtnamn och artist finns med
+            # Lägg bara till om både titel och artist finns
             if title and artist:
                 favorite_songs.append({
                     'title': title,
                     'artist': artist,
-                    'icon': icon or '🎵'  # Default icon om inget annat ges
+                    'icon': icon or '🎵'  # Vi har en default emoji om inget annat uppges
                 })
         
-        # Vi sparar favoritlåtarna som en json
+        # Spara favoritlåtar som JSON-sträng
         current_user.favorite_songs = json.dumps(favorite_songs) if favorite_songs else None
         
-        # Här hanterar vi profilbilden i alla steg. Hur den hämtas och kollas att den funkar.
+        # Hantera profilbild
         if 'profilePicture' in request.files:
             file = request.files['profilePicture']
             if file and file.filename != '':
@@ -486,7 +486,7 @@ def edit_profile():
                 file.save(os.path.join(PROFILE_PICS_FOLDER, filename))
                 current_user.profilePicture = filename
         
-        # Hanterar song picture på samma sätt
+        # Hantera låt-bild
         if 'song_picture' in request.files:
             file = request.files['song_picture']
             if file and file.filename != '':
@@ -494,8 +494,34 @@ def edit_profile():
                 file.save(os.path.join(SONG_PICS_FOLDER, filename))
                 current_user.song_picture = filename
         
-        # Sparar ändringarna i databasen
+        # Spotify-synkronisering
+        if current_user.spotify_access_token:
+            try:
+                # Skapa Spotify-klient
+                sp = spotipy.Spotify(auth=current_user.spotify_access_token)
+                
+                # Hämta topplåtar direkt via Spotify API
+                top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
+                
+                spotify_favorite_songs = []
+                for track in top_tracks['items']:
+                    spotify_favorite_songs.append({
+                        'title': track['name'],
+                        'artist': track['artists'][0]['name'],
+                        'icon': User._get_track_emoji(track['name']),
+                        'spotify_id': track['id']
+                    })
+                
+                # Valfri: Lägg till Spotify-låtar om inga manuellt valts
+                if not favorite_songs and spotify_favorite_songs:
+                    current_user.favorite_songs = json.dumps(spotify_favorite_songs)
+            except Exception as e:
+                # Felhantering om Spotify-synk misslyckas
+                print(f"Spotify sync error: {e}")
+        
+        # Spara ändringar
         db.session.commit()
+        
         flash('Your profile has been updated!')
         return redirect(url_for('profile', username=current_user.username))
     
@@ -633,49 +659,11 @@ def spotify_disconnect():
     flash('Spotify account disconnected.')
     return redirect(url_for('profile', username=current_user.username))
 
-#Synkar låtarna från Spotify
-@app.route('/spotify/sync_songs', methods=['POST'])
-@login_required
-def spotify_sync_songs():
-    # Tar användarens favoritlåtar
-
-    # Kollar så att användaren är inloggad och har en token
-    if not current_user.spotify_access_token:
-        flash('Please connect your Spotify account first.', 'error')
-        return redirect(url_for('edit_profile'))
-    
-    try:
-        # Skapar en Spotify Client
-        sp = spotipy.Spotify(auth=current_user.spotify_access_token)
-        
-        # Fetchar 5 favoritlåtar
-        top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
-        
-        # Förbereder en lista med favoritlåtarna
-        favorite_songs = []
-        for track in top_tracks['items']:
-            favorite_songs.append({
-                'title': track['name'],
-                'artist': track['artists'][0]['name'],
-                'spotify_id': track['id']
-            })
-        
-        # Sparar detta 
-        current_user.favorite_songs = json.dumps(favorite_songs)
-        db.session.commit()
-        
-        flash('Successfully synced Spotify songs!', 'success')
-    except Exception as e:
-        app.logger.error(f"Spotify song sync error: {str(e)}")
-        flash('Failed to sync Spotify songs. Please try again.', 'error')
-    
-    return redirect(url_for('edit_profile'))
-
 @app.context_processor
 def spotify_context_processor():
-    """
-    Provide Spotify-related helper functions to templates
-    """
+    
+    # Context_processorn hjälper att lägga till Spotify relaterade funktioner tillgänliga överallt
+    
     def get_spotify_top_tracks(user):
         """
         Retrieve user's top Spotify tracks
