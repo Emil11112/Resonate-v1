@@ -7,22 +7,22 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="card-header d-flex justify-content-between align-items-center" style="background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
                     <div class="d-flex align-items-center">
                         <img src="{{ url_for('static', filename='profile_pics/' + user.profilePicture) }}" 
-                            class="profile-pic-small rounded-circle" 
+                            class="profile-pic-small rounded-circle me-2" 
                             alt="{{ user.username }}'s profile picture">
-                        <strong>{{ post.user.username }}</strong>
+                        <strong style="color: var(--text-primary);">{{ post.user.username }}</strong>
                     </div>
                     <small class="text-muted">{{ post.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
                 </div>
-                <div class="card-body">
+                <div class="card-body" style="background-color: var(--bg-secondary); color: var(--text-primary);">
                     <p>{{ post.content }}</p>
                 </div>
-                <div class="card-footer">
+                <div class="card-footer" style="background-color: var(--bg-tertiary); border-top: 1px solid var(--border-color);">
                     <div class="d-flex justify-content-between align-items-center">
                         <form method="POST" action="{{ url_for('like_post', post_id=post.postId) }}" class="d-inline">
-                            <button type="submit" class="btn btn-link">
+                            <button type="submit" class="btn btn-link" style="color: var(--text-primary);">
                                 {% if current_user.is_authenticated and current_user.has_liked_post(post) %}
                                     <i class="bi bi-heart-fill text-danger"></i>
                                 {% else %}
@@ -31,18 +31,21 @@
                                 {{ post.likes.count() }} Likes
                             </button>
                         </form>
-                        <span>{{ post.comments.count() }} Comments</span>
+                        <span class="text-muted">{{ post.comments.count() }} Comments</span>
                     </div>
                 </div>
             </div>
 
             {% if current_user.is_authenticated %}
             <div class="card mb-4">
-                <div class="card-header">Add a Comment</div>
-                <div class="card-body">
+                <div class="card-header" style="background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
+                    <h5 class="mb-0" style="color: var(--text-primary);">Add a Comment</h5>
+                </div>
+                <div class="card-body" style="background-color: var(--bg-secondary);">
                     <form method="POST" action="{{ url_for('add_comment', post_id=post.postId) }}">
                         <div class="mb-3">
-                            <textarea class="form-control" name="content" rows="3" required></textarea>
+                            <textarea class="form-control" name="content" rows="3" required 
+                                      style="background-color: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-color);"></textarea>
                         </div>
                         <button type="submit" class="btn btn-primary">Comment</button>
                     </form>
@@ -50,15 +53,19 @@
             </div>
             {% endif %}
 
+            {% if post.comments.count() > 0 %}
             <div class="card">
-                <div class="card-header">Comments</div>
+                <div class="card-header" style="background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
+                    <h5 class="mb-0" style="color: var(--text-primary);">Comments</h5>
+                </div>
                 <ul class="list-group list-group-flush">
                     {% for comment in post.comments %}
-                    <li class="list-group-item">
+                    <li class="list-group-item" style="background-color: var(--bg-secondary); color: var(--text-primary); border-color: var(--border-color);">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center">
                                 <img src="{{ url_for('static', filename='profile_pics/' + comment.user.profilePicture) }}" 
-                                     class="rounded-circle me-3" style="width: 30px; height: 30px; object-fit: cover;">
+                                     class="profile-pic-small rounded-circle me-2" 
+                                     alt="{{ comment.user.username }}'s profile picture">
                                 <strong>{{ comment.user.username }}</strong>
                             </div>
                             <small class="text-muted">{{ comment.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
@@ -68,6 +75,16 @@
                     {% endfor %}
                 </ul>
             </div>
+            {% else %}
+            <div class="card">
+                <div class="card-header" style="background-color: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
+                    <h5 class="mb-0" style="color: var(--text-primary);">Comments</h5>
+                </div>
+                <div class="card-body text-center text-muted" style="background-color: var(--bg-secondary);">
+                    No comments yet
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
