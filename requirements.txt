@@ -4,3 +4,4 @@ Flask-Login
 spotipy
 python-dotenv
 requests
+Werkzeug

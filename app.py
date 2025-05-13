@@ -30,6 +30,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
 UPLOAD_FOLDER = 'static'
 PROFILE_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'profile_pics')
 SONG_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'song_pics')
+POST_PICS_FOLDER = os.path.join(UPLOAD_FOLDER, 'post_pics')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # Spotify OAuth konfig
@@ -44,6 +45,7 @@ SPOTIFY_SCOPES = [
 # Vi kollar att uppladdnings konfigen finns
 os.makedirs(PROFILE_PICS_FOLDER, exist_ok=True)
 os.makedirs(SONG_PICS_FOLDER, exist_ok=True)
+os.makedirs(POST_PICS_FOLDER, exist_ok=True)
 
 # Funktion som kollar om filen är i korrekt format
 def allowed_file(filename):
@@ -150,11 +152,9 @@ class Post(db.Model):
     userId = db.Column(db.String(36), db.ForeignKey('users.userId'), nullable=False)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    post_picture = db.Column(db.String(200), nullable=True) 
     
-    # Relationen med user
     user = db.relationship('User', backref=db.backref('posts', lazy='dynamic'))
-    
-    # Relation med likes och comments
     likes = db.relationship('Like', primaryjoin='Post.postId==Like.postId', 
                             backref='post', lazy='dynamic')
     comments = db.relationship('Comment', primaryjoin='Post.postId==Comment.postId', 
@@ -316,28 +316,38 @@ def register():
 # En route för att skapa en post
 @app.route('/create_post', methods=['GET', 'POST'])
 @login_required
-
 def create_post():
     if request.method == 'POST':
-        #Vi ber användaren att fylla i content
+        # Get the content
         content = request.form.get('content')
         
-        # Om det inte finns något content så kan man inte publicera
-        if not content:
-            flash('Post content cannot be empty.')
+        # If no content, return error
+        if not content and 'post_picture' not in request.files:
+            flash('Post must have content or an image.')
             return redirect(url_for('create_post'))
         
-        # Skapar en post
+        # Handle image upload
+        post_picture = None
+        if 'post_picture' in request.files:
+            file = request.files['post_picture']
+            if file and file.filename != '':
+                # Generate a unique filename
+                filename = secure_filename(f"{current_user.username}_{int(datetime.utcnow().timestamp())}_post.{file.filename.rsplit('.', 1)[1].lower()}")
+                # Save the file
+                file.save(os.path.join(POST_PICS_FOLDER, filename))
+                post_picture = filename
+        
+        # Create the post
         new_post = Post(
             userId=current_user.userId,
-            content=content
+            content=content,
+            post_picture=post_picture
         )
         
-        # Commitar till databasen
+        # Add and commit to database
         db.session.add(new_post)
         db.session.commit()
         
-        #Notis som dyker upp att det gick att posta
         flash('Post created successfully!')
         return redirect(url_for('view_post', post_id=new_post.postId))
     
