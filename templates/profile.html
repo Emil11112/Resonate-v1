@@ -284,13 +284,13 @@
 <!-- Spotify Embed Modal -->
 <div class="modal fade" id="previewModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Now Playing</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content" style="background-color: var(--bg-secondary); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title" style="color: var(--text-primary);">Now Playing</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center">
-                <h6 id="previewTrackName"></h6>
+                <h6 id="previewTrackName" style="color: var(--text-primary);"></h6>
                 <p id="previewTrackArtist" class="text-muted"></p>
                 <iframe id="spotifyEmbed" 
                         style="border-radius:12px; width: 100%; max-width: 600px; height: 380px;" 
@@ -303,7 +303,6 @@
         </div>
     </div>
 </div>
-
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const previewButtons = document.querySelectorAll('.preview-btn');
@@ -336,7 +335,6 @@
         });
     });
 </script>
-
 <style>
     /* Circular Profile Picture Styles */
     .profile-pic-container {
