@@ -682,17 +682,28 @@ def spotify_context_processor():
         
         #Försöker skapa en Spotify client och hämta deras 5 top tracks
         try:
+            # Refresh token if needed
+            if (user.spotify_token_expiry and 
+                datetime.utcnow() >= user.spotify_token_expiry):
+                refresh_spotify_token(user)
+            
             sp = spotipy.Spotify(auth=user.spotify_access_token)
             top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
             
             #Lägger låtarna i en lista
             formatted_tracks = []
             for track in top_tracks['items']:
+                # Generate embed URL
+                embed_link = f"https://open.spotify.com/embed/track/{track['id']}"
+                
                 formatted_tracks.append({
                     'name': track['name'],
                     'artist': track['artists'][0]['name'],
                     'album_art': track['album']['images'][0]['url'] if track['album']['images'] else None,
-                    'external_url': track['external_urls']['spotify']
+                    'external_url': track['external_urls']['spotify'],
+                    'preview_url': track['preview_url'],
+                    'spotify_id': track['id'],
+                    'embed_url': embed_link
                 })
             
             return formatted_tracks
