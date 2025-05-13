@@ -70,11 +70,19 @@
                                         <h6 class="mb-1">{{ track.name }}</h6>
                                         <p class="text-muted mb-0">{{ track.artist }}</p>
                                     </div>
-                                    <a href="{{ track.external_url }}" 
-                                       target="_blank" 
-                                       class="btn btn-link ms-auto">
-                                        <i class="bi bi-spotify"></i>
-                                    </a>
+                                    <div class="ms-auto d-flex align-items-center">
+                                        <button class="btn btn-link preview-btn me-2" 
+                                                data-embed-url="{{ track.embed_url }}"
+                                                data-track-name="{{ track.name }}"
+                                                data-artist="{{ track.artist }}">
+                                            <i class="bi bi-play-circle"></i>
+                                        </button>
+                                        <a href="{{ track.external_url }}" 
+                                           target="_blank" 
+                                           class="btn btn-link">
+                                            <i class="bi bi-spotify"></i>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                             {% endfor %}
@@ -175,8 +183,7 @@
                 </div>
             </div>
 
-            <!-- Rest of the profile page remains the same -->
-            <!-- Music Preferences Section -->
+            <!-- Favorite Songs Section -->
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">Favorite Songs</h5>
@@ -273,6 +280,62 @@
         </div>
     </div>
 </div>
+
+<!-- Spotify Embed Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Now Playing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <h6 id="previewTrackName"></h6>
+                <p id="previewTrackArtist" class="text-muted"></p>
+                <iframe id="spotifyEmbed" 
+                        style="border-radius:12px; width: 100%; max-width: 600px; height: 380px;" 
+                        frameBorder="0" 
+                        allowfullscreen="" 
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                        loading="lazy">
+                </iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const previewButtons = document.querySelectorAll('.preview-btn');
+        const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+        const spotifyEmbed = document.getElementById('spotifyEmbed');
+        const previewTrackName = document.getElementById('previewTrackName');
+        const previewTrackArtist = document.getElementById('previewTrackArtist');
+
+        previewButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const embedUrl = this.getAttribute('data-embed-url');
+                const trackName = this.getAttribute('data-track-name');
+                const artist = this.getAttribute('data-artist');
+
+                // Set track info
+                previewTrackName.textContent = trackName;
+                previewTrackArtist.textContent = artist;
+
+                // Set embed source
+                spotifyEmbed.src = embedUrl;
+
+                // Show modal
+                previewModal.show();
+            });
+        });
+
+        // Reset iframe when modal is closed
+        document.getElementById('previewModal').addEventListener('hidden.bs.modal', function () {
+            spotifyEmbed.src = '';
+        });
+    });
+</script>
 
 <style>
     /* Circular Profile Picture Styles */
