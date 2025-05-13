@@ -61,10 +61,10 @@ login_manager.login_view = 'login'
 
  # Här under så definierar vi databasen
 
- # Först ut så är tabellen för followers, med ID för den som följer och blir följd.
+# Först ut så är tabellen för followers, med ID för den som följer och blir följd.
 followers = db.Table('followers',
-    db.Column('followerId', db.String(36), db.ForeignKey('users.userId'), primary_key=True),
-    db.Column('followingId', db.String(36), db.ForeignKey('users.userId'), primary_key=True)
+    db.Column('follower_id', db.String(36), db.ForeignKey('users.userId'), primary_key=True),
+    db.Column('followed_id', db.String(36), db.ForeignKey('users.userId'), primary_key=True)
 )
 
 # Allt som sparas i databasen för en User
@@ -87,27 +87,24 @@ class User(UserMixin, db.Model):
     song_picture = db.Column(db.String(200), nullable=True)
     favorite_songs = db.Column(db.String, nullable=True)
 
-    # Followers relationen
-    _followers = db.relationship(
+    # Followers relationen med mer explicit metod
+    followed = db.relationship(
         'User', 
-        secondary='followers',
-        primaryjoin='User.userId==followers.c.followerId',
-        secondaryjoin='User.userId==followers.c.followingId',
-        backref='following'
+        secondary=followers,
+        primaryjoin=(followers.c.follower_id == userId),
+        secondaryjoin=(followers.c.followed_id == userId),
+        backref=db.backref('followers', lazy='dynamic'),
+        lazy='dynamic'
     )
 
-    # Funktionen ska returnera vilka som följer en
-    def followers(self):
-        
-        return db.session.query(User).join(
-            followers, 
-            (followers.c.followerId == User.userId)
-        ).filter(followers.c.followingId == self.userId)
-    
+    # Lägg till following som en property för kompatibilitet
+    @property
+    def following(self):
+        return self.followed
+
     # Hämtar id:et för en användare
     def get_id(self):
         return self.userId
-
 
     def __init__(self, username, email, password=None, **kwargs):
         # ETT UUID genereras om inte det finns
@@ -132,18 +129,23 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password, password)
     
     def follow(self, user):
+        """Follow another user."""
         if not self.is_following(user):
             self.followed.append(user)
             
     def unfollow(self, user):
+        """Unfollow another user."""
         if self.is_following(user):
             self.followed.remove(user)
 
     def is_following(self, user):
-        return db.session.query(followers).filter(
-        followers.c.followerId == self.userId,
-        followers.c.followingId == user.userId
-        ).count() > 0
+        """Check if current user is following another user."""
+        return self.followed.filter(followers.c.followed_id == user.userId).count() > 0
+    
+    def followers_count(self):
+        """Get the number of followers."""
+        return self.followers.count()
+
     
     # Tabell i databasen för posts
 class Post(db.Model):
@@ -553,8 +555,8 @@ def follow(username):
         return redirect(url_for('profile', username=username))
     
     # Om du inte redan följer människan så gör du det nu och uppdaterar databasen
-    if user not in current_user.following:
-        current_user.following.append(user)
+    if not current_user.is_following(user):
+        current_user.follow(user)
         db.session.commit()
         flash(f'You are now following {username}!')
     
@@ -574,8 +576,8 @@ def unfollow(username):
         return redirect(url_for('profile', username=username))
     
     # kollar om du följer människan, annars görs inget.
-    if user in current_user.following:
-        current_user.following.remove(user)
+    if current_user.is_following(user):
+        current_user.unfollow(user)
         db.session.commit()
         flash(f'You have unfollowed {username}.')
     
